@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Remarcar Cliente</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .edit-box { background: #2a2a2a; padding: 40px; border-radius: 15px; border: 1px solid #dc143c; width: 400px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; background: #1a1a1a; border: 1px solid #444; color: white; }
+        button { width: 100%; padding: 15px; background: #dc143c; color: white; border: none; cursor: pointer; font-weight: bold; border-radius: 5px; }
+        button:hover { background: #b01030; }
+        .btn-cancel { background: transparent; border: 1px solid #666; margin-top: 10px; }
+        .btn-cancel:hover { background: #333; }
+    </style>
+</head>
+<body>
+    <div class="edit-box">
+        <h2 style="color: #dc143c; text-align: center;">Remarcar Cliente</h2>
+        <p style="text-align: center; margin-bottom: 20px;">Cliente: <strong>{{ cliente['nome'] }}</strong></p>
+
+        <form method="POST">
+            <label>Nova Data:</label>
+            <input type="date" name="data" value="{{ data }}" required>
+
+            <label>Novo Horário:</label>
+            <select name="horario" style="width: 100%; padding: 10px; background: #1a1a1a; color: white; border: 1px solid #444; margin-bottom: 20px;">
+                {% for h in ["09:00", "10:00", "11:00", "12:00", "14:00", "15:00", "16:00", "17:00", "18:00"] %}
+                    <option value="{{ h }}" {% if h == hora %}selected{% endif %}>{{ h }}</option>
+                {% endfor %}
+            </select>
+
+            <button type="submit">Salvar Alteração</button>
+            <a href="{{ url_for('main.admin_panel') }}"><button type="button" class="btn-cancel">Cancelar</button></a>
+        </form>
+    </div>
+</body>
+</html>

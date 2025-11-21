@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barbearia W.S - Estilo e Atitude</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">W.S</div>
+            <ul class="nav-links">
+                <li><a href="#home">Início</a></li>
+                <li><a href="#agenda">Agenda</a></li>
+                <li><a href="#produtos">Loja</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <section class="slider" id="home">
+        <div class="slides-wrapper">
+            <div class="slide active" id="slide-1">
+                <div class="hero-content">
+                    <h1>BARBEARIA W.S</h1>
+                    <p>Estilo, Atitude e Exclusividade</p>
+                    <a href="#agenda" class="cta-button">Agende seu Horário</a>
+                </div>
+            </div>
+            <div class="slide" id="slide-2">
+                <div class="hero-content">
+                    <h1>CONHEÇA NOSSA LOJA</h1>
+                    <p>Produtos e Roupas Exclusivas</p>
+                    <a href="#produtos" class="cta-button">Ver Produtos</a>
+                </div>
+            </div>
+            <div class="slide" id="slide-3">
+                <div class="hero-content">
+                    <h1>OS MELHORES PROFISSIONAIS</h1>
+                    <p>Tradição e Modernidade no seu Corte</p>
+                    <a href="#agenda" class="cta-button">Agende seu Horário</a>
+                </div>
+            </div>
+        </div>
+        <button class="slider-control prev" id="slide-prev">&#10094;</button>
+        <button class="slider-control next" id="slide-next">&#10095;</button>
+        <div class="slider-dots" id="slider-dots">
+            </div>
+    </section>
+
+    <section id="agenda">
+        <h2>Agende seu Horário</h2>
+
+        <div class="agenda-container">
+            <div class="date-selector-wrapper">
+                <label for="date-selector">Escolha o dia:</label>
+                <input type="date" id="date-selector">
+            </div>
+
+            <div id="horarios-grid">
+                </div>
+        </div>
+
+    </section>
+
+    <section id="produtos">
+        <h2>Loja Exclusiva</h2>
+        <div class="products-grid">
+            <div class="product-card">
+                <div class="product-image">👕</div>
+                <div class="product-info">
+                    <h3>Camiseta W.S Premium</h3>
+                    <p>100% algodão com estampa exclusiva</p>
+                    <div class="product-price">R$ 89,90</div>
+                    <button class="buy-button" onclick="comprar('Camiseta W.S Premium')">Comprar</button>
+                </div>
+            </div>
+            <div class="product-card">
+                <div class="product-image">🧢</div>
+                <div class="product-info">
+                    <h3>Boné Snapback W.S</h3>
+                    <p>Ajustável com logo bordado</p>
+                    <div class="product-price">R$ 69,90</div>
+                    <button class="buy-button" onclick="comprar('Boné Snapback W.S')">Comprar</button>
+                </div>
+            </div>
+            <div class="product-card">
+                <div class="product-image">👔</div>
+                <div class="product-info">
+                    <h3>Moletom W.S Black</h3>
+                    <p>Conforto e estilo para o dia a dia</p>
+                    <div class="product-price">R$ 149,90</div>
+                    <button class="buy-button" onclick="comprar('Moletom W.S Black')">Comprar</button>
+                </div>
+            </div>
+            <div class="product-card">
+                <div class="product-image">🎽</div>
+                <div class="product-info">
+                    <h3>Regata W.S Sport</h3>
+                    <p>Tecido respirável para treino</p>
+                    <div class="product-price">R$ 59,90</div>
+                    <button class="buy-button" onclick="comprar('Regata W.S Sport')">Comprar</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="footer-content">
+            <h3 style="color: #dc143c;">BARBEARIA W.S</h3>
+            <p>Estilo e atitude em um só lugar</p>
+            <div class="social-links">
+                <a href="#">📱</a>
+                <a href="#">📧</a>
+                <a href="#">📍</a>
+            </div>
+            <p>&copy; 2024 Barbearia W.S - Todos os direitos reservados</p>
+        </div>
+    </footer>
+    <div class="modal-overlay" id="booking-modal">
+        <div class="modal-content">
+            <button class="modal-close" id="modal-close-btn">&times;</button>
+            <h3>Confirmar Agendamento</h3>
+            <p id="modal-recap">Você está agendando para...</p>
+
+            <form id="booking-form" class="modal-form">
+                <div class="form-group">
+                    <label for="modal-nome">Seu Nome:</label>
+                    <input type="text" id="modal-nome" required>
+                </div>
+                <div class="form-group">
+                    <label for="modal-telefone">Seu Telefone:</label>
+                    <input type="tel" id="modal-telefone" required>
+                </div>
+                <button type="submit" class="submit-button">Confirmar</button>
+            </form>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

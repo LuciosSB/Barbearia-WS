@@ -1,0 +1,847 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #1a1a1a;
+    color: #fff;
+    overflow-x: hidden;
+}
+
+header {
+    background: linear-gradient(135deg, #000 0%, #1a1a1a 100%);
+    padding: 20px 0;
+    position: fixed;
+    width: 100%;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 20px rgba(220, 20, 60, 0.3);
+}
+
+nav {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+}
+
+.logo {
+    font-size: 32px;
+    font-weight: bold;
+    color: #dc143c;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+.nav-links {
+    display: flex;
+    gap: 30px;
+    list-style: none;
+}
+
+.nav-links a {
+    color: #fff;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s;
+    position: relative;
+}
+
+.nav-links a:hover {
+    color: #dc143c;
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: #dc143c;
+    transition: width 0.3s;
+}
+
+.nav-links a:hover::after {
+    width: 100%;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+}
+
+.hero h1 {
+    font-size: 64px;
+    margin-bottom: 20px;
+    text-shadow: 3px 3px 6px rgba(0,0,0,0.7);
+}
+
+.hero p {
+    font-size: 24px;
+    margin-bottom: 30px;
+    color: #f0f0f0;
+}
+
+.cta-button {
+    display: inline-block;
+    padding: 15px 40px;
+    background: #dc143c;
+    color: #fff;
+    text-decoration: none;
+    font-weight: bold;
+    border-radius: 50px;
+    transition: all 0.3s;
+    box-shadow: 0 5px 15px rgba(220, 20, 60, 0.4);
+}
+
+.cta-button:hover {
+    background: #b01030;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(220, 20, 60, 0.6);
+}
+
+section {
+    max-width: 1200px;
+    margin: 80px auto;
+    padding: 0 20px;
+}
+
+h2 {
+    font-size: 42px;
+    text-align: center;
+    margin-bottom: 50px;
+    color: #dc143c;
+    text-transform: uppercase;
+}
+
+.services-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 30px;
+}
+
+.service-card {
+    background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+    padding: 30px;
+    border-radius: 15px;
+    text-align: center;
+    transition: all 0.3s;
+    border: 2px solid transparent;
+}
+
+.service-card:hover {
+    transform: translateY(-10px);
+    border-color: #dc143c;
+    box-shadow: 0 10px 30px rgba(220, 20, 60, 0.3);
+}
+
+.service-icon {
+    font-size: 48px;
+    margin-bottom: 20px;
+}
+
+.service-card h3 {
+    color: #dc143c;
+    margin-bottom: 15px;
+    font-size: 24px;
+}
+
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 30px;
+}
+
+.product-card {
+    background: #2a2a2a;
+    border-radius: 15px;
+    overflow: hidden;
+    transition: all 0.3s;
+    border: 2px solid #1a1a1a;
+}
+
+.product-card:hover {
+    transform: scale(1.05);
+    border-color: #dc143c;
+    box-shadow: 0 15px 40px rgba(220, 20, 60, 0.4);
+}
+
+.product-image {
+    width: 100%;
+    height: 300px;
+    background: linear-gradient(135deg, #4a4a4a, #2a2a2a);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 64px;
+    color: #dc143c;
+}
+
+.product-info {
+    padding: 20px;
+}
+
+.product-info h3 {
+    color: #fff;
+    margin-bottom: 10px;
+}
+
+.product-price {
+    color: #dc143c;
+    font-size: 24px;
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+.buy-button {
+    width: 100%;
+    padding: 12px;
+    background: #dc143c;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.3s;
+}
+
+.buy-button:hover {
+    background: #b01030;
+}
+
+footer {
+    background: #000;
+    padding: 40px 20px;
+    text-align: center;
+    margin-top: 80px;
+    border-top: 3px solid #dc143c;
+}
+
+.footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.social-links {
+    margin: 20px 0;
+}
+
+.social-links a {
+    color: #fff;
+    font-size: 24px;
+    margin: 0 15px;
+    transition: color 0.3s;
+}
+
+.social-links a:hover {
+    color: #dc143c;
+}
+
+@media (max-width: 768px) {
+    .hero h1 {
+        font-size: 42px;
+    }
+
+    .nav-links {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    h2 {
+        font-size: 32px;
+    }
+}
+
+/* --- NOVOS ESTILOS: Seção Agenda (Etapa 2) --- */
+
+.agenda-container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: #2a2a2a;
+    padding: 30px;
+    border-radius: 15px;
+    border: 2px solid #dc143c;
+}
+
+.date-selector-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.date-selector-wrapper label {
+    font-size: 18px;
+    font-weight: bold;
+    color: #dc143c;
+    margin-bottom: 10px;
+}
+
+/* Estilizando o input de data */
+#date-selector {
+    padding: 10px 15px;
+    background: #1a1a1a;
+    border: 2px solid #4a4a4a;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.3s;
+    color-scheme: dark
+}
+
+#date-selector:focus {
+    outline: none;
+    border-color: #dc143c;
+}
+
+/* Estilo para o ícone do calendário (pode variar entre browsers) */
+#date-selector::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(0.8);
+    cursor: pointer;
+}
+
+/* Grid de Horários */
+#horarios-grid {
+    display: grid;
+    /* Cria colunas automáticas de no mínimo 100px */
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 15px;
+    justify-items: center;
+}
+
+.horario-slot {
+    width: 100%;
+    padding: 20px 10px;
+    font-size: 18px;
+    font-weight: bold;
+    border-radius: 8px;
+    border: 2px solid;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-align: center;
+}
+
+/* Horário Livre */
+.horario-slot.livre {
+    background: transparent;
+    border-color: #dc143c;
+    color: #dc143c;
+}
+
+.horario-slot.livre:hover {
+    background: #dc143c;
+    color: #fff;
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(220, 20, 60, 0.4);
+}
+
+/* Horário Ocupado */
+.horario-slot.ocupado {
+    background: #4a4a4a;
+    border-color: #4a4a4a;
+    color: #888;
+    cursor: not-allowed;
+    text-decoration: line-through;
+}
+
+/* --- NOVOS ESTILOS: Modal de Agendamento (Etapa 3) --- */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 2000;
+    
+    /* Centraliza o conteúdo */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    /* Controla a exibição (escondido por padrão) */
+    visibility: hidden;
+    opacity: 0;
+    transition: all 0.3s ease-in-out;
+}
+
+/* Classe 'show' que o JS vai adicionar */
+.modal-overlay.show {
+    visibility: visible;
+    opacity: 1;
+}
+
+.modal-content {
+    background: #2a2a2a;
+    padding: 30px 40px;
+    border-radius: 15px;
+    border: 2px solid #dc143c;
+    box-shadow: 0 10px 40px rgba(220, 20, 60, 0.3);
+    
+    max-width: 500px;
+    width: 90%; /* Responsivo */
+    position: relative;
+
+    /* Animação de entrada */
+    transform: translateY(-20px);
+    transition: all 0.3s ease-in-out;
+}
+
+.modal-overlay.show .modal-content {
+    transform: translateY(0);
+}
+
+.modal-content h3 {
+    color: #dc143c;
+    font-size: 28px;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.modal-content p {
+    text-align: center;
+    margin-bottom: 25px;
+    font-size: 18px;
+}
+
+.modal-close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 32px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.3s;
+}
+
+.modal-close:hover {
+    color: #dc143c;
+}
+
+/* Reutilizando os estilos do formulário antigo
+  (que mandamos deletar) para o novo formulário do modal.
+*/
+.modal-form .form-group {
+    margin-bottom: 20px;
+}
+
+.modal-form label {
+    display: block;
+    margin-bottom: 8px;
+    color: #dc143c;
+    font-weight: bold;
+}
+
+/* Estilo para os inputs do modal */
+.modal-form input[type="text"],
+.modal-form input[type="tel"] {
+    width: 100%;
+    padding: 12px;
+    background: #1a1a1a;
+    border: 2px solid #4a4a4a;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 16px;
+}
+
+.modal-form input:focus {
+    outline: none;
+    border-color: #dc143c;
+}
+
+/* Estilo para o botão de submit do modal */
+.modal-form .submit-button {
+    width: 100%;
+    padding: 15px;
+    background: #dc143c;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.modal-form .submit-button:hover {
+    background: #b01030;
+    transform: translateY(-2px);
+}
+
+/* --- NOVOS ESTILOS: Slider Hero (Etapa 4) --- */
+
+.slider {
+    margin-top: 80px; /* Mantém o espaçamento do header */
+    height: 600px;
+    position: relative;
+    overflow: hidden;
+}
+
+.slides-wrapper {
+    width: 100%;
+    height: 100%;
+}
+
+.slide {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    
+    /* Transição de fade (opacidade) */
+    opacity: 0;
+    transition: opacity 1s ease-in-out;
+
+    /* Centraliza o conteúdo (como o .hero fazia) */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+
+    /* Configuração padrão das imagens de fundo */
+    background-size: cover;
+    background-position: center;
+}
+
+.slide.active {
+    opacity: 1; /* Mostra o slide ativo */
+}
+
+/* Aqui você define suas imagens de fundo. 
+  Por enquanto, usei cores e gradientes de exemplo.
+  TROQUE OS 'background' PELA SUA 'background-image: url(...)'
+*/
+#slide-1 {
+    /* Ex: background-image: url('imagens/barbearia.jpg'); */
+    background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), linear-gradient(135deg, #dc143c 0%, #000 100%);
+}
+
+#slide-2 {
+    /* Ex: background-image: url('imagens/loja.jpg'); */
+    background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), linear-gradient(135deg, #333 0%, #111 100%); 
+}
+
+#slide-3 {
+    /* Ex: background-image: url('imagens/corte.jpg'); */
+    background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), linear-gradient(135deg, #dc143c 0%, #222 100%);
+}
+
+
+/* Reutilizando .hero-content que já está estilizado.
+  Apenas garantimos que ele fique acima do fundo. 
+*/
+.slide .hero-content {
+    position: relative;
+    z-index: 2;
+    /* Animação sutil de entrada do texto */
+    animation: fadeInContent 1.5s ease-out;
+}
+
+@keyframes fadeInContent {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
+/* Controles de Navegação (Setas) */
+.slider-control {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.4);
+    color: #fff;
+    border: none;
+    font-size: 28px;
+    font-weight: bold;
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.slider-control:hover {
+    background: rgba(220, 20, 60, 0.8); /* Cor #dc143c com transparência */
+}
+
+.slider-control.prev {
+    left: 10px;
+    border-radius: 0 8px 8px 0;
+}
+
+.slider-control.next {
+    right: 10px;
+    border-radius: 8px 0 0 8px;
+}
+
+/* Bolinhas de Navegação (Dots) */
+.slider-dots {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    gap: 10px;
+}
+
+.slider-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    border: 2px solid transparent;
+    padding: 0; /* Garante que o padding não afete o tamanho */
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.slider-dot.active,
+.slider-dot:hover {
+    background: #fff;
+    border: 2px solid #dc143c;
+}
+/* --- TOAST NOTIFICATIONS (Feedback Visual) --- */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 3000;
+}
+
+.toast {
+    min-width: 300px;
+    padding: 15px 20px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    color: #fff;
+    font-weight: bold;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast.success {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    border-left: 5px solid #155724;
+}
+
+.toast.error {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    border-left: 5px solid #721c24;
+}
+
+/* --- MELHORIA NO FORMULÁRIO --- */
+/* Feedback visual se o campo for inválido */
+input:invalid {
+    border-color: #dc3545;
+}
+/* Texto de ajuda pequeno */
+.input-help {
+    font-size: 12px;
+    color: #888;
+    margin-top: 4px;
+    display: block;
+}
+
+/* =========================================
+   ÁREA ADMINISTRATIVA (ADMIN PANEL)
+   ========================================= */
+
+.admin-container {
+    max-width: 1200px;
+    margin: 120px auto;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Divide a tela em 2 */
+    gap: 30px;
+}
+
+.painel-box {
+    background: #2a2a2a;
+    padding: 20px;
+    border-radius: 15px;
+    border: 1px solid #444;
+}
+
+.painel-box h2 {
+    color: #dc143c;
+    text-transform: uppercase;
+    font-size: 24px;
+    margin-bottom: 15px;
+}
+
+/* Estilo da Tabela (Especifico para dentro do admin) */
+.admin-container table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    color: #fff;
+}
+
+.admin-container th,
+.admin-container td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #444;
+    font-size: 14px;
+}
+
+.admin-container th {
+    background-color: #333;
+    color: #dc143c;
+}
+
+/* Botões de Ação */
+.btn-checkin {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 12px;
+    transition: background 0.3s;
+}
+
+.btn-checkin:hover {
+    background: #218838;
+}
+
+.btn-atender {
+    display: block;
+    width: 100%;
+    padding: 15px;
+    margin-top: 20px;
+    background: #dc143c;
+    color: white;
+    font-weight: bold;
+    text-align: center;
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 18px;
+    transition: background 0.3s;
+}
+
+.btn-atender:hover {
+    background: #b01030;
+}
+
+/* Itens da Fila */
+.fila-item {
+    background: #1a1a1a;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-left: 4px solid #dc143c;
+    display: flex;
+    justify-content: space-between;
+    border-radius: 4px;
+}
+
+.fila-destaque {
+    font-weight: bold;
+    font-size: 18px;
+    color: #fff;
+}
+
+/* Botão Cancelar (Admin) */
+.btn-cancelar {
+    background: #dc3545; /* Vermelho */
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: bold;
+    transition: background 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-cancelar:hover {
+    background: #a71d2a; /* Vermelho mais escuro */
+}
+
+/* --- GRID DE HORÁRIOS ESTILIZADO --- */
+#horarios-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.horario-slot {
+    padding: 15px 10px;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 50px; /* Borda redonda estilo 'pill' */
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    background-color: transparent;
+    font-family: 'Arial', sans-serif;
+}
+
+/* Estado Livre */
+.horario-slot.livre {
+    border: 2px solid #dc143c;
+    color: #fff;
+    box-shadow: 0 0 5px rgba(220, 20, 60, 0.2);
+}
+
+.horario-slot.livre:hover {
+    background-color: #dc143c;
+    color: #fff;
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(220, 20, 60, 0.6); /* Brilho neon */
+}
+
+/* Estado Ocupado/Passado */
+.horario-slot.ocupado {
+    border: 2px solid #444;
+    background-color: #2a2a2a;
+    color: #666;
+    cursor: not-allowed;
+    text-decoration: line-through;
+}
+
+.btn-editar {
+    background: #ffc107;
+    color: #000;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-editar:hover {
+    background: #e0a800;
+}

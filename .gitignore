@@ -1,0 +1,14 @@
+# Arquivos do PyCharm
+.idea/
+
+# Cache do Python
+__pycache__/
+*.py[cod]
+
+# Ambiente Virtual (bibliotecas instaladas)
+venv/
+.venv/
+env/
+
+# Banco de dados local (se tiver)
+*.sqlite3
