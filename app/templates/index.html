@@ -4,16 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Barbearia W.S - Estilo e Atitude</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <header>
         <nav>
             <div class="logo">W.S</div>
-            <ul class="nav-links">
-                <li><a href="#home">Início</a></li>
-                <li><a href="#agenda">Agenda</a></li>
-                <li><a href="#produtos">Loja</a></li>
+
+            <div class="hamburger" id="hamburger-btn">
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </div>
+
+            <ul class="nav-links" id="nav-links">
+                <li><a href="#home" onclick="fecharMenu()">Início</a></li>
+                <li><a href="#agenda" onclick="fecharMenu()">Agenda</a></li>
+                <li><a href="#produtos" onclick="fecharMenu()">Loja</a></li>
+                <li><a href="{{ url_for('main.login') }}" style="color: #666;"><i class="fas fa-lock"></i></a></li>
             </ul>
         </nav>
     </header>
@@ -44,8 +53,7 @@
         </div>
         <button class="slider-control prev" id="slide-prev">&#10094;</button>
         <button class="slider-control next" id="slide-next">&#10095;</button>
-        <div class="slider-dots" id="slider-dots">
-            </div>
+        <div class="slider-dots" id="slider-dots"></div>
     </section>
 
     <section id="agenda">
@@ -60,48 +68,37 @@
             <div id="horarios-grid">
                 </div>
         </div>
-
     </section>
 
     <section id="produtos">
         <h2>Loja Exclusiva</h2>
+
         <div class="products-grid">
+
+            {% for produto in produtos %}
             <div class="product-card">
-                <div class="product-image">👕</div>
+
+                <div class="product-image">
+                    <img src="{{ url_for('static', filename='uploads/' + produto.imagem) }}"
+                         alt="{{ produto.nome }}"
+                         style="width: 100%; height: 100%; object-fit: cover;">
+                </div>
+
                 <div class="product-info">
-                    <h3>Camiseta W.S Premium</h3>
-                    <p>100% algodão com estampa exclusiva</p>
-                    <div class="product-price">R$ 89,90</div>
-                    <button class="buy-button" onclick="comprar('Camiseta W.S Premium')">Comprar</button>
+                    <h3>{{ produto.nome }}</h3>
+                    <p>Produto oficial W.S</p>
+                    <div class="product-price">{{ produto.preco }}</div>
+
+                    <button class="buy-button" onclick="comprar('{{ produto.nome }}')">Comprar</button>
                 </div>
             </div>
-            <div class="product-card">
-                <div class="product-image">🧢</div>
-                <div class="product-info">
-                    <h3>Boné Snapback W.S</h3>
-                    <p>Ajustável com logo bordado</p>
-                    <div class="product-price">R$ 69,90</div>
-                    <button class="buy-button" onclick="comprar('Boné Snapback W.S')">Comprar</button>
-                </div>
-            </div>
-            <div class="product-card">
-                <div class="product-image">👔</div>
-                <div class="product-info">
-                    <h3>Moletom W.S Black</h3>
-                    <p>Conforto e estilo para o dia a dia</p>
-                    <div class="product-price">R$ 149,90</div>
-                    <button class="buy-button" onclick="comprar('Moletom W.S Black')">Comprar</button>
-                </div>
-            </div>
-            <div class="product-card">
-                <div class="product-image">🎽</div>
-                <div class="product-info">
-                    <h3>Regata W.S Sport</h3>
-                    <p>Tecido respirável para treino</p>
-                    <div class="product-price">R$ 59,90</div>
-                    <button class="buy-button" onclick="comprar('Regata W.S Sport')">Comprar</button>
-                </div>
-            </div>
+            {% else %}
+                <p style="text-align: center; color: #888; width: 100%; grid-column: 1 / -1; padding: 40px;">
+                    Nenhum produto disponível no momento. <br>
+                    <small>Acesse o painel admin para cadastrar.</small>
+                </p>
+            {% endfor %}
+
         </div>
     </section>
 
@@ -117,6 +114,7 @@
             <p>&copy; 2024 Barbearia W.S - Todos os direitos reservados</p>
         </div>
     </footer>
+
     <div class="modal-overlay" id="booking-modal">
         <div class="modal-content">
             <button class="modal-close" id="modal-close-btn">&times;</button>
@@ -130,12 +128,20 @@
                 </div>
                 <div class="form-group">
                     <label for="modal-telefone">Seu Telefone:</label>
-                    <input type="tel" id="modal-telefone" required>
+                    <input type="tel" id="modal-telefone" required placeholder="(XX) XXXXX-XXXX">
                 </div>
                 <button type="submit" class="submit-button">Confirmar</button>
             </form>
         </div>
     </div>
+
+    <a href="https://wa.me/5582999999999?text=Olá,%20gostaria%20de%20agendar%20um%20horário!"
+       class="btn-whatsapp"
+       target="_blank"
+       title="Fale conosco no WhatsApp">
+        <i class="fab fa-whatsapp"></i>
+    </a>
+
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>

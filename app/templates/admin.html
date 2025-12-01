@@ -4,105 +4,174 @@
     <meta charset="UTF-8">
     <title>W.S - Gestão Completa</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <header>
         <nav>
             <div class="logo">SISTEMA W.S</div>
             <ul class="nav-links">
-                <li><a href="{{ url_for('main.index') }}">Ir para Site Cliente</a></li>
+                <li style="color: #666; margin-right: 15px;">Olá, {{ usuario.username }}</li>
+                <li><a href="{{ url_for('main.index') }}">Ir para Site</a></li>
+                <li><a href="{{ url_for('main.logout') }}" style="color: #dc143c;">Sair</a></li>
             </ul>
         </nav>
     </header>
 
     <section class="admin-container">
 
-        <div class="painel-box">
+        <div style="grid-column: 1 / -1;">
+            <div class="dashboard-metrics">
+                <div class="metric-card">
+                    <h3>Agendados Hoje</h3>
+                    <div class="metric-number">{{ total_hoje }}</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Próximos 7 Dias</h3>
+                    <div class="metric-number">{{ total_semana }}</div>
+                </div>
+                <div class="metric-card" style="border-color: #ffc107;">
+                    <h3>Na Fila Agora</h3>
+                    <div class="metric-number" style="color: #ffc107;">{{ total_fila }}</div>
+                </div>
+            </div>
+        </div>
 
-            <h2 style="color: #28a745;">🔥 Agendamentos de HOJE</h2>
+        <div class="painel-box">
+            <h2 style="color: #28a745;">🔥 Hoje</h2>
             <table>
                 <thead>
                     <tr>
                         <th>Hora</th>
                         <th>Cliente</th>
+                        <th>Status</th>
                         <th>Ações</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for chave, dados in agendamentos_hoje %}
+                    {% for item in agendamentos_hoje %}
                     <tr>
-                        <td style="font-size: 18px; font-weight: bold;">{{ chave[-5:] }}</td>
+                        <td style="font-size: 18px; font-weight: bold;">{{ item.horario }}</td>
                         <td>
-                            {{ dados['nome'] }}<br>
-                            <small style="color:#888">{{ dados['telefone'] }}</small>
+                            {{ item.nome }}<br>
+                            <small style="color:#888">{{ item.telefone }}</small>
                         </td>
+                        <td><span class="status-badge badge-agendado">Agendado</span></td>
                         <td style="display: flex; gap: 5px;">
-                            <a href="{{ url_for('main.checkin', chave=chave) }}" class="btn-checkin" title="Check-in">✔</a>
-                            <a href="{{ url_for('main.editar', chave=chave) }}" class="btn-editar" title="Remarcar">✏️</a>
-                            <a href="{{ url_for('main.cancelar', chave=chave) }}" class="btn-cancelar" title="Cancelar" onclick="return confirm('Cancelar?')">✖</a>
+                            <a href="{{ url_for('main.checkin', id=item.id) }}" class="btn-checkin" title="Chegou"><i class="fas fa-check"></i></a>
+                            <a href="{{ url_for('main.editar', id=item.id) }}" class="btn-editar"><i class="fas fa-pen"></i></a>
+                            <a href="{{ url_for('main.cancelar', id=item.id) }}" class="btn-cancelar" onclick="return confirm('Cancelar?')"><i class="fas fa-times"></i></a>
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="3" style="text-align:center; padding:15px; color:#666">Nada para hoje.</td></tr>
+                    <tr><td colspan="4" style="text-align:center; padding:15px; color:#666">Nada para hoje.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
 
             <hr style="border: 0; border-top: 1px solid #444; margin: 30px 0;">
 
-            <h2 style="font-size: 20px; color: #dc143c;">📅 Próximos Dias</h2>
+            <h2 style="font-size: 20px; color: #dc143c;">📅 Futuros</h2>
             <table>
                 <thead>
                     <tr>
-                        <th>Data/Hora</th>
+                        <th>Data</th>
                         <th>Cliente</th>
                         <th>Ações</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for chave, dados in agendamentos_futuros %}
+                    {% for item in agendamentos_futuros %}
                     <tr>
-                        <td>{{ chave }}</td>
-                        <td>{{ dados['nome'] }}</td>
+                        <td><strong>{{ item.data.strftime('%d/%m') }}</strong><br>{{ item.horario }}</td>
+                        <td>{{ item.nome }}</td>
                         <td style="display: flex; gap: 5px;">
-                            <a href="{{ url_for('main.editar', chave=chave) }}" class="btn-editar" title="Remarcar">✏️</a>
-                            <a href="{{ url_for('main.cancelar', chave=chave) }}" class="btn-cancelar" title="Cancelar" onclick="return confirm('Cancelar?')">✖</a>
+                            <a href="{{ url_for('main.editar', id=item.id) }}" class="btn-editar"><i class="fas fa-pen"></i></a>
+                            <a href="{{ url_for('main.cancelar', id=item.id) }}" class="btn-cancelar" onclick="return confirm('Cancelar?')"><i class="fas fa-times"></i></a>
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="3" style="text-align:center; color:#666">Agenda futura vazia.</td></tr>
+                    <tr><td colspan="3" style="text-align:center; color:#666">Agenda vazia.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
 
-        <div class="painel-box" style="border-color: #dc143c;">
-            <h2>✂️ Fila de Espera (FIFO)</h2>
-            <p>Clientes na loja aguardando corte.</p>
-
+        <div class="painel-box" style="border-color: #ffc107;">
+            <h2 style="color: #ffc107;">✂️ Fila de Espera</h2>
             {% if fila %}
                 <div style="margin-top: 20px;">
-                    <p style="margin-bottom: 10px; color: #888;">Próximo a ser atendido:</p>
-
-                    <div class="fila-item" style="background: #dc143c; color: white; border: none;">
-                        <span class="fila-destaque">1. {{ fila[0]['nome'] }}</span>
-                        <span>{{ fila[0]['telefone'] }}</span>
+                    <div class="fila-item" style="background: linear-gradient(45deg, #ffc107, #ff9800); color: #000; border: none;">
+                        <span class="fila-destaque">1. {{ fila[0].nome }}</span>
+                        <span style="font-weight: bold;">{{ fila[0].horario }}</span>
                     </div>
-
                     {% for cliente in fila[1:] %}
-                    <div class="fila-item">
-                        <span>{{ loop.index + 1 }}. {{ cliente['nome'] }}</span>
+                    <div class="fila-item" style="border-left: 4px solid #ffc107;">
+                        <span>{{ loop.index + 1 }}. {{ cliente.nome }}</span>
+                        <span class="status-badge badge-fila">Aguardando</span>
                     </div>
                     {% endfor %}
                 </div>
-
-                <a href="{{ url_for('main.atender_proximo') }}" class="btn-atender">🔔 CHAMAR PRÓXIMO</a>
+                <a href="{{ url_for('main.atender_proximo') }}" class="btn-finalizar">✅ FINALIZAR ATENDIMENTO</a>
             {% else %}
                 <div style="padding: 40px; text-align: center; color: #666;">
                     <h3>Fila Vazia</h3>
-                    <p>Faça o Check-in de um cliente ao lado.</p>
                 </div>
             {% endif %}
+        </div>
+
+        <div class="painel-box" style="grid-column: 1 / -1; margin-top: 20px; border-color: #007bff;">
+            <h2 style="color: #007bff;">🛍️ Catálogo de Produtos</h2>
+            <p style="margin-bottom: 20px; color: #888;">Adicione produtos para aparecerem na página inicial.</p>
+
+            <form action="{{ url_for('main.novo_produto') }}" method="POST" enctype="multipart/form-data" style="display: flex; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; align-items: flex-end;">
+
+                <div style="flex: 2; min-width: 200px;">
+                    <label style="display: block; color: #fff; margin-bottom: 5px;">Nome do Produto</label>
+                    <input type="text" name="nome" required placeholder="Ex: Pomada Modeladora" style="width: 100%; padding: 10px; background: #1a1a1a; border: 1px solid #444; color: white; border-radius: 5px;">
+                </div>
+
+                <div style="flex: 1; min-width: 120px;">
+                    <label style="display: block; color: #fff; margin-bottom: 5px;">Preço</label>
+                    <input type="text" name="preco" required placeholder="R$ 35,00" style="width: 100%; padding: 10px; background: #1a1a1a; border: 1px solid #444; color: white; border-radius: 5px;">
+                </div>
+
+                <div style="flex: 1; min-width: 150px;">
+                    <label style="display: block; color: #fff; margin-bottom: 5px;">Foto (Arquivo)</label>
+                    <input type="file" name="imagem" accept="image/*" required style="width: 100%; padding: 10px; background: #1a1a1a; border: 1px solid #444; color: white; border-radius: 5px;">
+                </div>
+
+                <button type="submit" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; height: 40px; font-weight: bold; margin-bottom: 2px;">+ Adicionar</button>
+            </form>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Foto</th>
+                        <th>Nome</th>
+                        <th>Preço</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for prod in produtos %}
+                    <tr>
+                        <td>
+                            <img src="{{ url_for('static', filename='uploads/' + prod.imagem) }}" alt="Foto" style="width: 50px; height: 50px; object-fit: cover; border-radius: 5px;">
+                        </td>
+                        <td>{{ prod.nome }}</td>
+                        <td style="color: #28a745; font-weight: bold;">{{ prod.preco }}</td>
+                        <td>
+                            <a href="{{ url_for('main.deletar_produto', id=prod.id) }}" class="btn-cancelar" onclick="return confirm('Apagar este produto?')" title="Excluir">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" style="text-align:center; padding: 20px; color:#666;">Nenhum produto cadastrado.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
 
     </section>

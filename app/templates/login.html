@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Barbearia W.S</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="login-page">
+
+    <div class="login-container">
+        <div class="login-box">
+            <h2 style="color: #dc143c; margin-bottom: 20px;">Área Restrita</h2>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="alert-error">
+                        {{ messages[0] }}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form action="{{ url_for('main.login') }}" method="POST">
+                <div class="input-group">
+                    <label for="username">Usuário</label>
+                    <input type="text" id="username" name="username" required placeholder="Digite seu usuário">
+                </div>
+
+                <div class="input-group">
+                    <label for="password">Senha</label>
+                    <input type="password" id="password" name="password" required placeholder="Digite sua senha">
+                </div>
+
+                <button type="submit" class="btn-login">ENTRAR</button>
+            </form>
+
+            <div class="login-footer">
+                <a href="{{ url_for('main.index') }}">← Voltar para o Site</a>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

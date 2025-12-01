@@ -5,6 +5,7 @@
     <title>Remarcar Cliente</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
+        /* Estilos inline mantidos para centralizar o formulário específico desta página */
         body { display: flex; justify-content: center; align-items: center; height: 100vh; }
         .edit-box { background: #2a2a2a; padding: 40px; border-radius: 15px; border: 1px solid #dc143c; width: 400px; }
         input { width: 100%; padding: 10px; margin: 10px 0; background: #1a1a1a; border: 1px solid #444; color: white; }
@@ -17,7 +18,8 @@
 <body>
     <div class="edit-box">
         <h2 style="color: #dc143c; text-align: center;">Remarcar Cliente</h2>
-        <p style="text-align: center; margin-bottom: 20px;">Cliente: <strong>{{ cliente['nome'] }}</strong></p>
+
+        <p style="text-align: center; margin-bottom: 20px;">Cliente: <strong>{{ cliente.nome }}</strong></p>
 
         <form method="POST">
             <label>Nova Data:</label>
@@ -31,6 +33,7 @@
             </select>
 
             <button type="submit">Salvar Alteração</button>
+
             <a href="{{ url_for('main.admin_panel') }}"><button type="button" class="btn-cancel">Cancelar</button></a>
         </form>
     </div>
