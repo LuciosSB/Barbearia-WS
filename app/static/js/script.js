@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     // =========================================
-    // 1. CONFIGURAÇÕES GERAIS E ELEMENTOS
+    // 1. ELEMENTOS E CONFIGURAÇÕES
     // =========================================
     const modal = document.getElementById('booking-modal');
     const modalCloseBtn = document.getElementById('modal-close-btn');
@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
     let slotSelecionado = { data: null, horario: null };
 
+    // =========================================
+    // 2. SISTEMA DE NOTIFICAÇÃO (TOAST)
+    // =========================================
     function showToast(mensagem, tipo = 'success') {
         let container = document.querySelector('.toast-container');
         if (!container) {
@@ -34,6 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 4000);
     }
 
+    // =========================================
+    // 3. MÁSCARA DE TELEFONE
+    // =========================================
     if (inputTelefone) {
         inputTelefone.addEventListener('input', (e) => {
             let value = e.target.value.replace(/\D/g, '');
@@ -47,6 +53,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // =========================================
+    // 4. LÓGICA DO MODAL DE AGENDAMENTO
+    // =========================================
     window.abrirModal = function(data, horario) {
         slotSelecionado.data = data;
         slotSelecionado.horario = horario;
@@ -94,6 +103,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // =========================================
+    // 5. GRID DE HORÁRIOS
+    // =========================================
     async function carregarHorarios(dataSelecionada) {
         if(!horariosGrid) return;
         horariosGrid.innerHTML = '<p style="color:gray">Verificando...</p>';
@@ -224,15 +236,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const diff = touchStartX - touchEndX;
             const threshold = 50;
             if (Math.abs(diff) > threshold) {
-                if (diff > 0) {
-                    nextSlide();
-                } else {
-                    prevSlide();
-                }
+                if (diff > 0) nextSlide(); else prevSlide();
                 resetInterval();
             }
         }
-
         createDots();
         startInterval();
     }
@@ -250,6 +257,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// =========================================
+// 8. FUNÇÕES GLOBAIS (FORA DO DOMContentLoaded)
+// =========================================
+
 window.fecharMenu = function() {
     const hamburgerBtn = document.getElementById('hamburger-btn');
     const navLinks = document.getElementById('nav-links');
@@ -257,4 +268,11 @@ window.fecharMenu = function() {
         hamburgerBtn.classList.remove('active');
         navLinks.classList.remove('active');
     }
+};
+
+window.comprar = function(produto) {
+    const telefoneBarbearia = "5582987126184";
+    const texto = `Olá! Gostaria de comprar o produto: *${produto}*. Como faço para retirar?`;
+    const url = `https://wa.me/${telefoneBarbearia}?text=${encodeURIComponent(texto)}`;
+    window.open(url, '_blank');
 };
