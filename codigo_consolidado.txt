@@ -1,0 +1,2391 @@
+
+================================================================================
+ARQUIVO: Procfile
+================================================================================
+
+web: gunicorn run:app
+
+
+
+================================================================================
+ARQUIVO: requirements.txt
+================================================================================
+
+Flask
+Flask-SQLAlchemy
+Flask-Login
+psycopg2-binary
+python-dotenv
+gunicorn
+
+
+
+================================================================================
+ARQUIVO: run.py
+================================================================================
+
+from app import create_app
+
+app = create_app()
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+
+================================================================================
+ARQUIVO: app\models.py
+================================================================================
+
+from app import db
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+
+class Agendamento(db.Model):
+    __tablename__ = 'agendamentos'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    telefone = db.Column(db.String(20), nullable=False)
+    data = db.Column(db.Date, nullable=False)
+    horario = db.Column(db.String(5), nullable=False)
+    status = db.Column(db.String(20), default='agendado')
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "nome": self.nome,
+            "telefone": self.telefone,
+            "data": str(self.data),
+            "horario": self.horario,
+            "status": self.status
+        }
+
+class Usuario(UserMixin, db.Model):
+    __tablename__ = 'usuarios'
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(30), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256))
+
+    def set_senha(self, senha):
+        self.password_hash = generate_password_hash(senha)
+
+    def verificar_senha(self, senha):
+        return check_password_hash(self.password_hash, senha)
+
+class Produto(db.Model):
+    __tablename__ = 'produtos'
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    preco = db.Column(db.String(20), nullable=False)
+    imagem = db.Column(db.String(200), nullable=False)
+
+
+================================================================================
+ARQUIVO: app\__init__.py
+================================================================================
+
+import os
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager
+from dotenv import load_dotenv
+
+load_dotenv()
+
+db = SQLAlchemy()
+login_manager = LoginManager()
+
+def create_app():
+    app = Flask(__name__)
+
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+    db.init_app(app)
+    login_manager.init_app(app)
+    login_manager.login_view = 'main.login'
+    login_manager.login_message = "Por favor, faça login para acessar esta página."
+    from app.routes.main import main_bp
+    app.register_blueprint(main_bp)
+    with app.app_context():
+        db.create_all()
+    return app
+
+
+================================================================================
+ARQUIVO: app\estruturas\fila.py
+================================================================================
+
+class No:
+    def __init__(self, dado):
+        self.dado = dado
+        self.proximo = None
+
+
+class Fila:
+    def __init__(self):
+        self.inicio = None
+        self.fim = None
+        self.tamanho = 0
+
+    def entrar(self, dado):
+        novo_no = No(dado)
+
+        if self.fim is None:
+            self.inicio = novo_no
+            self.fim = novo_no
+        else:
+            self.fim.proximo = novo_no
+            self.fim = novo_no
+
+        self.tamanho += 1
+
+    def sair(self):
+        if self.inicio is None:
+            return None
+
+        dado_removido = self.inicio.dado
+
+        self.inicio = self.inicio.proximo
+
+        if self.inicio is None:
+
+            self.fim = None
+
+        self.tamanho -= 1
+        return dado_removido
+
+    def esta_vazia(self):
+        return self.inicio is None
+
+    def listar_para_template(self):
+        lista_visual = []
+        atual = self.inicio
+        while atual is not None:
+            lista_visual.append(atual.dado)
+            atual = atual.proximo
+        return lista_visual
+
+
+================================================================================
+ARQUIVO: app\estruturas\tabela_hash.py
+================================================================================
+
+class TabelaHash:
+    def __init__(self, tamanho=100):
+        self.tamanho = tamanho
+        self.tabela = [[] for _ in range(self.tamanho)]
+        self.quantidade = 0
+
+    def _hash(self, chave):
+        soma = 0
+        for char in chave:
+            soma = soma * 31 + ord(char)
+
+        return soma % self.tamanho
+
+    def inserir(self, chave, valor):
+        indice = self._hash(chave)
+        bucket = self.tabela[indice]
+
+        for i, (k, v) in enumerate(bucket):
+            if k == chave:
+                return False
+
+        bucket.append((chave, valor))
+        self.quantidade += 1
+        return True
+
+    def buscar(self, chave):
+        indice = self._hash(chave)
+        bucket = self.tabela[indice]
+
+        for k, v in bucket:
+            if k == chave:
+                return v
+
+        return None
+
+    def remover(self, chave):
+        indice = self._hash(chave)
+        bucket = self.tabela[indice]
+
+        for i, (k, v) in enumerate(bucket):
+            if k == chave:
+                del bucket[i]
+                self.quantidade -= 1
+                return True
+        return False
+
+    def listar_tudo(self):
+        todos_itens = []
+        for bucket in self.tabela:
+            for item in bucket:
+                todos_itens.append(item)  # item é uma tupla (chave, valor)
+        return todos_itens
+
+
+================================================================================
+ARQUIVO: app\estruturas\__init__.py
+================================================================================
+
+
+
+
+================================================================================
+ARQUIVO: app\routes\main.py
+================================================================================
+
+import os
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, current_app
+from flask_login import login_user, logout_user, login_required, current_user
+from werkzeug.utils import secure_filename
+from app import db, login_manager
+from app.models import Agendamento, Usuario, Produto
+from datetime import datetime, date, timedelta
+
+main_bp = Blueprint('main', __name__)
+
+HORARIOS_FUNCIONAMENTO = [
+    "09:00", "10:00", "11:00", "12:00",
+    "14:00", "15:00", "16:00", "17:00", "18:00"
+]
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return Usuario.query.get(int(user_id))
+
+@main_bp.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('main.admin_panel'))
+
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        user = Usuario.query.filter_by(username=username).first()
+
+        if user and user.verificar_senha(password):
+            login_user(user)
+            return redirect(url_for('main.admin_panel'))
+        else:
+            flash('Usuário ou senha incorretos.', 'error')
+
+    return render_template('login.html')
+
+@main_bp.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('main.login'))
+
+@main_bp.route('/setup')
+def setup_inicial():
+    if Usuario.query.first():
+        return "Já existe um usuário configurado. Setup bloqueado."
+    novo_admin = Usuario(username="admin")
+    novo_admin.set_senha("admin123")
+    db.session.add(novo_admin)
+    db.session.commit()
+    return "Usuário 'admin' criado com senha 'admin123'. Vá para /login."
+
+@main_bp.route('/')
+def index():
+    lista_produtos = Produto.query.all()
+    return render_template('index.html', produtos=lista_produtos)
+
+@main_bp.route('/agendar', methods=['POST'])
+def agendar():
+    dados = request.get_json()
+
+    if not dados or 'data' not in dados or 'horario' not in dados or 'nome' not in dados:
+        return jsonify({'sucesso': False, 'mensagem': 'Dados incompletos!'}), 400
+
+    nome = dados['nome'].strip()
+    telefone = dados.get('telefone', '').strip()
+    data_str = dados['data']
+    horario = dados['horario']
+
+    try:
+        data_obj = datetime.strptime(data_str, '%Y-%m-%d').date()
+        hoje = date.today()
+        if data_obj < hoje:
+            return jsonify({'sucesso': False, 'mensagem': 'Data inválida.'}), 400
+        if data_obj == hoje:
+            hora_atual = datetime.now().time()
+            hora_agendamento = datetime.strptime(horario, '%H:%M').time()
+            if hora_agendamento <= hora_atual:
+                return jsonify({'sucesso': False, 'mensagem': 'Horário já passou!'}), 400
+    except ValueError:
+        return jsonify({'sucesso': False, 'mensagem': 'Erro no formato da data.'}), 400
+
+    agendamento_existente = Agendamento.query.filter_by(data=data_obj, horario=horario).first()
+    if agendamento_existente:
+        return jsonify({'sucesso': False, 'mensagem': 'Horário indisponível.'}), 409
+
+    novo_agendamento = Agendamento(
+        nome=nome,
+        telefone=telefone,
+        data=data_obj,
+        horario=horario,
+        status='agendado'
+    )
+    db.session.add(novo_agendamento)
+    db.session.commit()
+    return jsonify({'sucesso': True, 'mensagem': 'Agendamento realizado!'}), 201
+
+@main_bp.route('/api/horarios/<data>', methods=['GET'])
+def verificar_horarios(data):
+    try:
+        data_obj = datetime.strptime(data, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({'ocupados': []})
+    agendamentos = Agendamento.query.filter_by(data=data_obj).all()
+    ocupados = [a.horario for a in agendamentos]
+    return jsonify({'ocupados': ocupados})
+
+@main_bp.route('/admin')
+@login_required
+def admin_panel():
+    hoje = date.today()
+
+    agendamentos_hoje = Agendamento.query.filter_by(data=hoje, status='agendado').order_by(Agendamento.horario).all()
+    agendamentos_futuros = Agendamento.query.filter(Agendamento.data > hoje, Agendamento.status == 'agendado').order_by(
+        Agendamento.data, Agendamento.horario).all()
+    fila = Agendamento.query.filter_by(status='na_fila').all()
+    produtos = Produto.query.all()
+    total_fila = len(fila)
+    total_hoje = Agendamento.query.filter_by(data=hoje).count()
+    data_limite = hoje + timedelta(days=6)
+    total_semana = Agendamento.query.filter(Agendamento.data >= hoje, Agendamento.data <= data_limite).count()
+
+    return render_template('admin.html',
+                           agendamentos_hoje=agendamentos_hoje,
+                           agendamentos_futuros=agendamentos_futuros,
+                           fila=fila,
+                           usuario=current_user,
+                           total_fila=total_fila,
+                           total_hoje=total_hoje,
+                           total_semana=total_semana,
+                           produtos=produtos)
+
+@main_bp.route('/admin/produto/novo', methods=['POST'])
+@login_required
+def novo_produto():
+    nome = request.form['nome']
+    preco = request.form['preco']
+    if 'imagem' not in request.files:
+        flash('Nenhum arquivo enviado', 'error')
+        return redirect(url_for('main.admin_panel'))
+
+    file = request.files['imagem']
+    imagem_db = "sem_foto.png"
+
+    if file.filename != '' and file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        upload_folder = os.path.join(current_app.root_path, 'static', 'uploads')
+        if not os.path.exists(upload_folder):
+            os.makedirs(upload_folder)
+        file.save(os.path.join(upload_folder, filename))
+        imagem_db = filename
+
+    novo_prod = Produto(nome=nome, preco=preco, imagem=imagem_db)
+    db.session.add(novo_prod)
+    db.session.commit()
+
+    return redirect(url_for('main.admin_panel'))
+
+@main_bp.route('/admin/produto/deletar/<int:id>')
+@login_required
+def deletar_produto(id):
+    prod = Produto.query.get_or_404(id)
+    db.session.delete(prod)
+    db.session.commit()
+    return redirect(url_for('main.admin_panel'))
+
+@main_bp.route('/admin/checkin/<int:id>')
+@login_required
+def checkin(id):
+    agendamento = Agendamento.query.get_or_404(id)
+    agendamento.status = 'na_fila'
+    db.session.commit()
+    return redirect(url_for('main.admin_panel'))
+
+@main_bp.route('/admin/atender')
+@login_required
+def atender_proximo():
+    proximo = Agendamento.query.filter_by(status='na_fila').first()
+    if proximo:
+        proximo.status = 'atendido'
+        db.session.commit()
+    return redirect(url_for('main.admin_panel'))
+
+@main_bp.route('/admin/cancelar/<int:id>')
+@login_required
+def cancelar(id):
+    agendamento = Agendamento.query.get_or_404(id)
+    db.session.delete(agendamento)
+    db.session.commit()
+    return redirect(url_for('main.admin_panel'))
+
+@main_bp.route('/admin/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def editar(id):
+    agendamento = Agendamento.query.get_or_404(id)
+    if request.method == 'POST':
+        nova_data = request.form['data']
+        novo_horario = request.form['horario']
+        agendamento.data = datetime.strptime(nova_data, '%Y-%m-%d').date()
+        agendamento.horario = novo_horario
+        db.session.commit()
+        return redirect(url_for('main.admin_panel'))
+    return render_template('editar.html', cliente=agendamento, data=agendamento.data, hora=agendamento.horario, id=id)
+
+
+================================================================================
+ARQUIVO: app\routes\__init__.py
+================================================================================
+
+
+
+
+================================================================================
+ARQUIVO: app\static\css\style.css
+================================================================================
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #1a1a1a;
+    color: #fff;
+    overflow-x: hidden;
+}
+
+header {
+    background: linear-gradient(135deg, #000 0%, #1a1a1a 100%);
+    padding: 20px 0;
+    position: fixed;
+    width: 100%;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 20px rgba(220, 20, 60, 0.3);
+}
+
+nav {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+}
+
+.logo {
+    font-size: 32px;
+    font-weight: bold;
+    color: #dc143c;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+.nav-links {
+    display: flex;
+    gap: 30px;
+    list-style: none;
+}
+
+.nav-links a {
+    color: #fff;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s;
+    position: relative;
+}
+
+.nav-links a:hover {
+    color: #dc143c;
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: #dc143c;
+    transition: width 0.3s;
+}
+
+.nav-links a:hover::after {
+    width: 100%;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+}
+
+.hero h1 {
+    font-size: 64px;
+    margin-bottom: 20px;
+    text-shadow: 3px 3px 6px rgba(0,0,0,0.7);
+}
+
+.hero p {
+    font-size: 24px;
+    margin-bottom: 30px;
+    color: #f0f0f0;
+}
+
+.cta-button {
+    display: inline-block;
+    padding: 15px 40px;
+    background: #dc143c;
+    color: #fff;
+    text-decoration: none;
+    font-weight: bold;
+    border-radius: 50px;
+    transition: all 0.3s;
+    box-shadow: 0 5px 15px rgba(220, 20, 60, 0.4);
+}
+
+.cta-button:hover {
+    background: #b01030;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(220, 20, 60, 0.6);
+}
+
+section {
+    max-width: 1200px;
+    margin: 80px auto;
+    padding: 0 20px;
+}
+
+h2 {
+    font-size: 42px;
+    text-align: center;
+    margin-bottom: 50px;
+    color: #dc143c;
+    text-transform: uppercase;
+}
+
+.services-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 30px;
+}
+
+.service-card {
+    background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+    padding: 30px;
+    border-radius: 15px;
+    text-align: center;
+    transition: all 0.3s;
+    border: 2px solid transparent;
+}
+
+.service-card:hover {
+    transform: translateY(-10px);
+    border-color: #dc143c;
+    box-shadow: 0 10px 30px rgba(220, 20, 60, 0.3);
+}
+
+.service-icon {
+    font-size: 48px;
+    margin-bottom: 20px;
+}
+
+.service-card h3 {
+    color: #dc143c;
+    margin-bottom: 15px;
+    font-size: 24px;
+}
+
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 30px;
+}
+
+.product-card {
+    background: #2a2a2a;
+    border-radius: 15px;
+    overflow: hidden;
+    transition: all 0.3s;
+    border: 2px solid #1a1a1a;
+}
+
+.product-card:hover {
+    transform: scale(1.05);
+    border-color: #dc143c;
+    box-shadow: 0 15px 40px rgba(220, 20, 60, 0.4);
+}
+
+.product-image {
+    width: 100%;
+    height: 300px;
+    background: linear-gradient(135deg, #4a4a4a, #2a2a2a);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 64px;
+    color: #dc143c;
+}
+
+.product-info {
+    padding: 20px;
+}
+
+.product-info h3 {
+    color: #fff;
+    margin-bottom: 10px;
+}
+
+.product-price {
+    color: #dc143c;
+    font-size: 24px;
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+.buy-button {
+    width: 100%;
+    padding: 12px;
+    background: #dc143c;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.3s;
+}
+
+.buy-button:hover {
+    background: #b01030;
+}
+
+footer {
+    background: #000;
+    padding: 40px 20px;
+    text-align: center;
+    margin-top: 80px;
+    border-top: 3px solid #dc143c;
+}
+
+.footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.social-links {
+    margin: 20px 0;
+}
+
+.social-links a {
+    color: #fff;
+    font-size: 24px;
+    margin: 0 15px;
+    transition: color 0.3s;
+}
+
+.social-links a:hover {
+    color: #dc143c;
+}
+
+@media (max-width: 768px) {
+    .hero h1 {
+        font-size: 42px;
+    }
+
+    .nav-links {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    h2 {
+        font-size: 32px;
+    }
+}
+
+
+.agenda-container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: #2a2a2a;
+    padding: 30px;
+    border-radius: 15px;
+    border: 2px solid #dc143c;
+}
+
+.date-selector-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.date-selector-wrapper label {
+    font-size: 18px;
+    font-weight: bold;
+    color: #dc143c;
+    margin-bottom: 10px;
+}
+
+#date-selector {
+    padding: 10px 15px;
+    background: #1a1a1a;
+    border: 2px solid #4a4a4a;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.3s;
+    color-scheme: dark
+}
+
+#date-selector:focus {
+    outline: none;
+    border-color: #dc143c;
+}
+
+#date-selector::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(0.8);
+    cursor: pointer;
+}
+
+#horarios-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 15px;
+    justify-items: center;
+}
+
+.horario-slot {
+    width: 100%;
+    padding: 20px 10px;
+    font-size: 18px;
+    font-weight: bold;
+    border-radius: 8px;
+    border: 2px solid;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-align: center;
+}
+
+/* Horário Livre */
+.horario-slot.livre {
+    background: transparent;
+    border-color: #dc143c;
+    color: #dc143c;
+}
+
+.horario-slot.livre:hover {
+    background: #dc143c;
+    color: #fff;
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(220, 20, 60, 0.4);
+}
+
+.horario-slot.ocupado {
+    background: #4a4a4a;
+    border-color: #4a4a4a;
+    color: #888;
+    cursor: not-allowed;
+    text-decoration: line-through;
+}
+
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 2000;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    visibility: hidden;
+    opacity: 0;
+    transition: all 0.3s ease-in-out;
+}
+
+.modal-overlay.show {
+    visibility: visible;
+    opacity: 1;
+}
+
+.modal-content {
+    background: #2a2a2a;
+    padding: 30px 40px;
+    border-radius: 15px;
+    border: 2px solid #dc143c;
+    box-shadow: 0 10px 40px rgba(220, 20, 60, 0.3);
+    
+    max-width: 500px;
+    width: 90%;
+    position: relative;
+
+    transform: translateY(-20px);
+    transition: all 0.3s ease-in-out;
+}
+
+.modal-overlay.show .modal-content {
+    transform: translateY(0);
+}
+
+.modal-content h3 {
+    color: #dc143c;
+    font-size: 28px;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.modal-content p {
+    text-align: center;
+    margin-bottom: 25px;
+    font-size: 18px;
+}
+
+.modal-close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 32px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.3s;
+}
+
+.modal-close:hover {
+    color: #dc143c;
+}
+
+.modal-form .form-group {
+    margin-bottom: 20px;
+}
+
+.modal-form label {
+    display: block;
+    margin-bottom: 8px;
+    color: #dc143c;
+    font-weight: bold;
+}
+
+.modal-form input[type="text"],
+.modal-form input[type="tel"] {
+    width: 100%;
+    padding: 12px;
+    background: #1a1a1a;
+    border: 2px solid #4a4a4a;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 16px;
+}
+
+.modal-form input:focus {
+    outline: none;
+    border-color: #dc143c;
+}
+
+.modal-form .submit-button {
+    width: 100%;
+    padding: 15px;
+    background: #dc143c;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.modal-form .submit-button:hover {
+    background: #b01030;
+    transform: translateY(-2px);
+}
+
+
+.slider {
+    margin-top: 80px;
+    height: 600px;
+    position: relative;
+    overflow: hidden;
+}
+
+.slides-wrapper {
+    width: 100%;
+    height: 100%;
+}
+
+.slide {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    transition: opacity 1s ease-in-out;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background-size: cover;
+    background-position: center;
+}
+
+.slide.active {
+    opacity: 1;
+}
+
+#slide-1 {
+    background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), linear-gradient(135deg, #dc143c 0%, #000 100%);
+}
+
+#slide-2 {
+    background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), linear-gradient(135deg, #333 0%, #111 100%); 
+}
+
+#slide-3 {
+    background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), linear-gradient(135deg, #dc143c 0%, #222 100%);
+}
+
+
+.slide .hero-content {
+    position: relative;
+    z-index: 2;
+    animation: fadeInContent 1.5s ease-out;
+}
+
+@keyframes fadeInContent {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
+.slider-control {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.4);
+    color: #fff;
+    border: none;
+    font-size: 28px;
+    font-weight: bold;
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.slider-control:hover {
+    background: rgba(220, 20, 60, 0.8);
+}
+
+.slider-control.prev {
+    left: 10px;
+    border-radius: 0 8px 8px 0;
+}
+
+.slider-control.next {
+    right: 10px;
+    border-radius: 8px 0 0 8px;
+}
+
+.slider-dots {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    gap: 10px;
+}
+
+.slider-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    border: 2px solid transparent;
+    padding: 0;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.slider-dot.active,
+.slider-dot:hover {
+    background: #fff;
+    border: 2px solid #dc143c;
+}
+
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 3000;
+}
+
+.toast {
+    min-width: 300px;
+    padding: 15px 20px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    color: #fff;
+    font-weight: bold;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast.success {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    border-left: 5px solid #155724;
+}
+
+.toast.error {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    border-left: 5px solid #721c24;
+}
+
+input:invalid {
+    border-color: #dc3545;
+}
+
+.input-help {
+    font-size: 12px;
+    color: #888;
+    margin-top: 4px;
+    display: block;
+}
+
+/* =========================================
+   ÁREA ADMINISTRATIVA (ADMIN PANEL)
+   ========================================= */
+
+.admin-container {
+    max-width: 1200px;
+    margin: 120px auto;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+}
+
+.painel-box {
+    background: #2a2a2a;
+    padding: 20px;
+    border-radius: 15px;
+    border: 1px solid #444;
+}
+
+.painel-box h2 {
+    color: #dc143c;
+    text-transform: uppercase;
+    font-size: 24px;
+    margin-bottom: 15px;
+}
+
+.admin-container table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    color: #fff;
+}
+
+.admin-container th,
+.admin-container td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #444;
+    font-size: 14px;
+}
+
+.admin-container th {
+    background-color: #333;
+    color: #dc143c;
+}
+
+.btn-checkin {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 12px;
+    transition: background 0.3s;
+}
+
+.btn-checkin:hover {
+    background: #218838;
+}
+
+.btn-atender {
+    display: block;
+    width: 100%;
+    padding: 15px;
+    margin-top: 20px;
+    background: #dc143c;
+    color: white;
+    font-weight: bold;
+    text-align: center;
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 18px;
+    transition: background 0.3s;
+}
+
+.btn-atender:hover {
+    background: #b01030;
+}
+
+.fila-item {
+    background: #1a1a1a;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-left: 4px solid #dc143c;
+    display: flex;
+    justify-content: space-between;
+    border-radius: 4px;
+}
+
+.fila-destaque {
+    font-weight: bold;
+    font-size: 18px;
+    color: #fff;
+}
+
+.btn-cancelar {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: bold;
+    transition: background 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-cancelar:hover {
+    background: #a71d2a;
+}
+
+#horarios-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.horario-slot {
+    padding: 15px 10px;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    background-color: transparent;
+    font-family: 'Arial', sans-serif;
+}
+
+.horario-slot.livre {
+    border: 2px solid #dc143c;
+    color: #fff;
+    box-shadow: 0 0 5px rgba(220, 20, 60, 0.2);
+}
+
+.horario-slot.livre:hover {
+    background-color: #dc143c;
+    color: #fff;
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(220, 20, 60, 0.6);
+}
+
+.horario-slot.ocupado {
+    border: 2px solid #444;
+    background-color: #2a2a2a;
+    color: #666;
+    cursor: not-allowed;
+    text-decoration: line-through;
+}
+
+.btn-editar {
+    background: #ffc107;
+    color: #000;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-editar:hover {
+    background: #e0a800;
+}
+
+/* =========================================
+   TELA DE LOGIN
+   ========================================= */
+
+.login-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #000 0%, #1a1a1a 100%);
+    padding: 20px;
+}
+
+.login-container {
+    width: 100%;
+    max-width: 400px;
+}
+
+.login-box {
+    background: #2a2a2a;
+    padding: 40px;
+    border-radius: 15px;
+    border: 2px solid #dc143c;
+    box-shadow: 0 0 20px rgba(220, 20, 60, 0.2);
+    text-align: center;
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.input-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #dc143c;
+    font-weight: bold;
+    font-size: 14px;
+    text-transform: uppercase;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 12px 15px;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 16px;
+    transition: all 0.3s;
+}
+
+.input-group input:focus {
+    border-color: #dc143c;
+    outline: none;
+    box-shadow: 0 0 8px rgba(220, 20, 60, 0.3);
+}
+
+.btn-login {
+    width: 100%;
+    padding: 15px;
+    background: #dc143c;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.2s;
+    margin-top: 10px;
+}
+
+.btn-login:hover {
+    background: #b01030;
+    transform: scale(1.02);
+}
+
+.login-footer {
+    margin-top: 25px;
+    border-top: 1px solid #444;
+    padding-top: 20px;
+}
+
+.login-footer a {
+    color: #888;
+    text-decoration: none;
+    font-size: 14px;
+    transition: color 0.3s;
+}
+
+.login-footer a:hover {
+    color: #dc143c;
+}
+
+.alert-error {
+    background: rgba(220, 53, 69, 0.1);
+    color: #ff6b6b;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    border: 1px solid #dc3545;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* =========================================
+   MENU RESPONSIVO (MOBILE)
+   ========================================= */
+
+/* 1. Esconde o botão hambúrguer no Desktop */
+.hamburger {
+    display: none;
+    cursor: pointer;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.hamburger .bar {
+    width: 25px;
+    height: 3px;
+    background-color: #fff;
+    transition: all 0.3s ease;
+}
+
+/* 2. Regras apenas para Celular/Tablet (telas menores que 768px) */
+@media (max-width: 768px) {
+
+    /* Mostra o botão hambúrguer */
+    .hamburger {
+        display: flex;
+        z-index: 1001; /* Fica acima de tudo */
+    }
+
+    /* Esconde o menu original e transforma em "Gaveta" */
+    .nav-links {
+        position: fixed;
+        top: 0;
+        right: -100%; /* Começa escondido fora da tela à direita */
+        width: 70%;   /* Ocupa 70% da tela */
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.95); /* Fundo preto quase sólido */
+        flex-direction: column; /* Links um embaixo do outro */
+        justify-content: center;
+        align-items: center;
+        transition: right 0.4s ease-in-out; /* Animação de deslize */
+        z-index: 1000;
+        box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+        border-left: 2px solid #dc143c;
+    }
+
+    /* Classe que o JavaScript vai adicionar para mostrar o menu */
+    .nav-links.active {
+        right: 0; /* Traz o menu para dentro da tela */
+    }
+
+    /* Aumenta o tamanho dos links para facilitar o toque */
+    .nav-links li {
+        margin: 20px 0;
+    }
+
+    .nav-links a {
+        font-size: 24px; /* Texto maior */
+    }
+
+    /* Animação do ícone virando um "X" quando aberto */
+    .hamburger.active .bar:nth-child(1) {
+        transform: translateY(8px) rotate(45deg);
+        background-color: #dc143c;
+    }
+
+    .hamburger.active .bar:nth-child(2) {
+        opacity: 0; /* Esconde a barra do meio */
+    }
+
+    .hamburger.active .bar:nth-child(3) {
+        transform: translateY(-8px) rotate(-45deg);
+        background-color: #dc143c;
+    }
+}
+
+/* =========================================
+   BOTÃO WHATSAPP FLUTUANTE
+   ========================================= */
+
+.btn-whatsapp {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    background-color: #25d366; /* Verde oficial do WhatsApp */
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 32px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+    z-index: 1000; /* Garante que fique acima de tudo */
+    text-decoration: none;
+    transition: all 0.3s ease;
+    animation: pulse 2s infinite; /* Efeito de "pulsar" para chamar atenção */
+}
+
+.btn-whatsapp:hover {
+    background-color: #128c7e;
+    transform: scale(1.1); /* Cresce um pouco ao passar o mouse */
+    color: #fff;
+}
+
+/* Animação suave para chamar atenção */
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7); }
+    70% { box-shadow: 0 0 0 15px rgba(37, 211, 102, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }
+}
+
+/* Ajuste para não ficar em cima do conteúdo no celular */
+@media (max-width: 768px) {
+    .btn-whatsapp {
+        bottom: 15px;
+        right: 15px;
+        width: 50px;
+        height: 50px;
+        font-size: 28px;
+    }
+}
+
+/* =========================================
+   MELHORIA GRID DE HORÁRIOS (TOUCH-FIRST)
+   ========================================= */
+
+#horarios-grid {
+    gap: 15px;
+    margin-top: 25px;
+    justify-content: center;
+}
+
+.horario-slot {
+    min-height: 55px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    letter-spacing: 1px;
+    border-radius: 12px;
+    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.horario-slot.livre {
+    background: rgba(220, 20, 60, 0.1);
+    border: 2px solid #dc143c;
+    color: #fff;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+}
+
+.horario-slot.livre:active {
+    background: #dc143c;
+    transform: scale(0.95);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+@media (hover: hover) {
+    .horario-slot.livre:hover {
+        transform: translateY(-3px);
+        background: #dc143c;
+        box-shadow: 0 8px 15px rgba(220, 20, 60, 0.4);
+    }
+}
+
+.horario-slot.ocupado {
+    background: #151515;
+    border: 2px solid #333;
+    color: #444;
+    text-decoration: none;
+    opacity: 0.7;
+}
+
+/* =========================================
+   NOVO DASHBOARD ADMIN (Métricas e Badges)
+   ========================================= */
+
+.dashboard-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.metric-card {
+    background: #2a2a2a;
+    padding: 25px;
+    border-radius: 12px;
+    border-left: 5px solid #dc143c;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    transition: transform 0.3s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-5px);
+}
+
+.metric-card h3 {
+    color: #888;
+    font-size: 14px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+}
+
+.metric-number {
+    color: #fff;
+    font-size: 36px;
+    font-weight: bold;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 50px;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-agendado {
+    background: rgba(0, 123, 255, 0.2);
+    color: #4da3ff;
+    border: 1px solid #007bff;
+}
+
+.badge-fila {
+    background: rgba(255, 193, 7, 0.2);
+    color: #ffc107;
+    border: 1px solid #ffc107;
+    animation: pulse-yellow 2s infinite;
+}
+
+.badge-atendido {
+    background: rgba(40, 167, 69, 0.2);
+    color: #28a745;
+    border: 1px solid #28a745;
+}
+
+/* Animação de pulsar para quem está na fila */
+@keyframes pulse-yellow {
+    0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(255, 193, 7, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+}
+
+.admin-container table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 10px;
+    margin-top: 0;
+}
+
+.admin-container tr {
+    background: #222;
+    transition: background 0.3s;
+}
+
+.admin-container tr:hover {
+    background: #2a2a2a;
+}
+
+.admin-container td {
+    padding: 20px;
+    border-bottom: none;
+    first-child: border-radius: 10px 0 0 10px;
+    last-child: border-radius: 0 10px 10px 0;
+}
+
+.btn-finalizar {
+    display: block;
+    background: #28a745;
+    color: white;
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 16px;
+    margin-top: 20px;
+}
+
+.btn-finalizar:hover {
+    background: #218838;
+}
+
+
+================================================================================
+ARQUIVO: app\static\js\script.js
+================================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    // =========================================
+    // 1. ELEMENTOS E CONFIGURAÇÕES
+    // =========================================
+    const modal = document.getElementById('booking-modal');
+    const modalCloseBtn = document.getElementById('modal-close-btn');
+    const modalRecap = document.getElementById('modal-recap');
+    const bookingForm = document.getElementById('booking-form');
+    const dateSelector = document.getElementById('date-selector');
+    const horariosGrid = document.getElementById('horarios-grid');
+    const inputTelefone = document.getElementById('modal-telefone');
+
+    const horariosFuncionamento = [
+        "09:00", "10:00", "11:00", "12:00",
+        "14:00", "15:00", "16:00", "17:00", "18:00"
+    ];
+    let slotSelecionado = { data: null, horario: null };
+
+    // =========================================
+    // 2. SISTEMA DE NOTIFICAÇÃO (TOAST)
+    // =========================================
+    function showToast(mensagem, tipo = 'success') {
+        let container = document.querySelector('.toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.className = 'toast-container';
+            document.body.appendChild(container);
+        }
+        const toast = document.createElement('div');
+        toast.className = `toast ${tipo}`;
+        toast.innerText = mensagem;
+        container.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    }
+
+    // =========================================
+    // 3. MÁSCARA DE TELEFONE
+    // =========================================
+    if (inputTelefone) {
+        inputTelefone.addEventListener('input', (e) => {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 11) value = value.slice(0, 11);
+            if (value.length > 6) {
+                value = `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`;
+            } else if (value.length > 2) {
+                value = `(${value.slice(0, 2)}) ${value.slice(2)}`;
+            }
+            e.target.value = value;
+        });
+    }
+
+    // =========================================
+    // 4. LÓGICA DO MODAL DE AGENDAMENTO
+    // =========================================
+    window.abrirModal = function(data, horario) {
+        slotSelecionado.data = data;
+        slotSelecionado.horario = horario;
+        const dataFormatada = data.split('-').reverse().join('/');
+        if(modalRecap) modalRecap.innerText = `Agendando para: ${dataFormatada} às ${horario}`;
+        if(modal) modal.classList.add('show');
+    };
+    function fecharModal() {
+        if(modal) modal.classList.remove('show');
+        if(bookingForm) bookingForm.reset();
+    }
+    if (modalCloseBtn) modalCloseBtn.addEventListener('click', fecharModal);
+    if (bookingForm) {
+        bookingForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nome = document.getElementById('modal-nome').value;
+            const telefone = document.getElementById('modal-telefone').value;
+            if (telefone.length < 14) {
+                showToast('Por favor, digite um telefone válido.', 'error');
+                return;
+            }
+            const payload = {
+                data: slotSelecionado.data,
+                horario: slotSelecionado.horario,
+                nome: nome,
+                telefone: telefone
+            };
+            try {
+                const response = await fetch('/agendar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                if (result.sucesso) {
+                    showToast(`Agendamento Confirmado!`, 'success');
+                    fecharModal();
+                    carregarHorarios(slotSelecionado.data);
+                } else {
+                    showToast(result.mensagem, 'error');
+                }
+            } catch (error) {
+                showToast('Erro de conexão com o servidor.', 'error');
+            }
+        });
+    }
+
+    // =========================================
+    // 5. GRID DE HORÁRIOS
+    // =========================================
+    async function carregarHorarios(dataSelecionada) {
+        if(!horariosGrid) return;
+        horariosGrid.innerHTML = '<p style="color:gray">Verificando...</p>';
+        try {
+            const response = await fetch(`/api/horarios/${dataSelecionada}`);
+            const dados = await response.json();
+            renderizarGrid(dataSelecionada, dados.ocupados || []);
+        } catch (error) {
+            horariosGrid.innerHTML = '<p style="color:red">Erro ao carregar.</p>';
+        }
+    }
+    function renderizarGrid(dataSelecionada, listaOcupados) {
+        if(!horariosGrid) return;
+        horariosGrid.innerHTML = '';
+        const agora = new Date();
+        const ano = agora.getFullYear();
+        const mes = String(agora.getMonth() + 1).padStart(2, '0');
+        const dia = String(agora.getDate()).padStart(2, '0');
+        const dataAtualStr = `${ano}-${mes}-${dia}`;
+        const horaAtual = agora.getHours();
+        const minutoAtual = agora.getMinutes();
+        const isHoje = (dataSelecionada === dataAtualStr);
+        horariosFuncionamento.forEach(horario => {
+            const btn = document.createElement('button');
+            btn.classList.add('horario-slot');
+            btn.innerText = horario;
+            const [horaBtnStr, minutoBtnStr] = horario.split(':');
+            const horaBtn = parseInt(horaBtnStr);
+            const minutoBtn = parseInt(minutoBtnStr);
+            let bloqueado = false;
+            if (listaOcupados.includes(horario)) bloqueado = true;
+            if (isHoje) {
+                if (horaBtn < horaAtual || (horaBtn === horaAtual && minutoBtn < minutoAtual)) {
+                    bloqueado = true;
+                }
+            }
+            if (bloqueado) {
+                btn.classList.add('ocupado');
+                btn.disabled = true;
+            } else {
+                btn.classList.add('livre');
+                btn.onclick = () => window.abrirModal(dataSelecionada, horario);
+            }
+            horariosGrid.appendChild(btn);
+        });
+    }
+
+    if (dateSelector) {
+        const hojeObj = new Date();
+        const ano = hojeObj.getFullYear();
+        const mes = String(hojeObj.getMonth() + 1).padStart(2, '0');
+        const dia = String(hojeObj.getDate()).padStart(2, '0');
+        const hojeStr = `${ano}-${mes}-${dia}`;
+        const maxObj = new Date();
+        maxObj.setMonth(maxObj.getMonth() + 1);
+        const maxStr = maxObj.toISOString().split('T')[0];
+        dateSelector.value = hojeStr;
+        dateSelector.min = hojeStr;
+        dateSelector.max = maxStr;
+        dateSelector.addEventListener('change', (e) => carregarHorarios(e.target.value));
+        carregarHorarios(hojeStr);
+    }
+
+    // =========================================
+    // 6. SLIDER COM SWIPE
+    // =========================================
+    const slides = document.querySelectorAll('.slide');
+    const nextBtn = document.getElementById('slide-next');
+    const prevBtn = document.getElementById('slide-prev');
+    const dotsContainer = document.getElementById('slider-dots');
+
+    if (slides.length > 0) {
+        let currentSlide = 0;
+        let slideInterval;
+        function createDots() {
+            if(!dotsContainer) return;
+            dotsContainer.innerHTML = '';
+            slides.forEach((_, index) => {
+                const dot = document.createElement('button');
+                dot.classList.add('slider-dot');
+                if (index === 0) dot.classList.add('active');
+                dot.addEventListener('click', () => {
+                    goToSlide(index);
+                    resetInterval();
+                });
+                dotsContainer.appendChild(dot);
+            });
+        }
+
+        function goToSlide(index) {
+            slides[currentSlide].classList.remove('active');
+            const dots = document.querySelectorAll('.slider-dot');
+            if(dots[currentSlide]) dots[currentSlide].classList.remove('active');
+            currentSlide = index;
+            slides[currentSlide].classList.add('active');
+            if(dots[currentSlide]) dots[currentSlide].classList.add('active');
+        }
+
+        function nextSlide() {
+            let newSlide = (currentSlide + 1) % slides.length;
+            goToSlide(newSlide);
+        }
+        function prevSlide() {
+            let newSlide = (currentSlide - 1 + slides.length) % slides.length;
+            goToSlide(newSlide);
+        }
+
+        function startInterval() { slideInterval = setInterval(nextSlide, 5000); }
+        function resetInterval() { clearInterval(slideInterval); startInterval(); }
+
+        if(nextBtn) nextBtn.addEventListener('click', () => { nextSlide(); resetInterval(); });
+        if(prevBtn) prevBtn.addEventListener('click', () => { prevSlide(); resetInterval(); });
+
+        let touchStartX = 0;
+        let touchEndX = 0;
+        const sliderContainer = document.querySelector('.slider');
+        if (sliderContainer) {
+            sliderContainer.addEventListener('touchstart', (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+            }, {passive: true});
+            sliderContainer.addEventListener('touchend', (e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                handleSwipe();
+            }, {passive: true});
+        }
+
+        function handleSwipe() {
+            const diff = touchStartX - touchEndX;
+            const threshold = 50;
+            if (Math.abs(diff) > threshold) {
+                if (diff > 0) nextSlide(); else prevSlide();
+                resetInterval();
+            }
+        }
+        createDots();
+        startInterval();
+    }
+
+    // =========================================
+    // 7. MENU MOBILE
+    // =========================================
+    const hamburgerBtn = document.getElementById('hamburger-btn');
+    const navLinks = document.getElementById('nav-links');
+    if (hamburgerBtn && navLinks) {
+        hamburgerBtn.addEventListener('click', () => {
+            hamburgerBtn.classList.toggle('active');
+            navLinks.classList.toggle('active');
+        });
+    }
+});
+
+// =========================================
+// 8. FUNÇÕES GLOBAIS (FORA DO DOMContentLoaded)
+// =========================================
+
+window.fecharMenu = function() {
+    const hamburgerBtn = document.getElementById('hamburger-btn');
+    const navLinks = document.getElementById('nav-links');
+    if (hamburgerBtn && navLinks) {
+        hamburgerBtn.classList.remove('active');
+        navLinks.classList.remove('active');
+    }
+};
+
+window.comprar = function(produto) {
+    const telefoneBarbearia = "5582987126184";
+    const texto = `Olá! Gostaria de comprar o produto: *${produto}*. Como faço para retirar?`;
+    const url = `https://wa.me/${telefoneBarbearia}?text=${encodeURIComponent(texto)}`;
+    window.open(url, '_blank');
+};
+
+
+
+================================================================================
+ARQUIVO: app\templates\admin.html
+================================================================================
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>W.S - Gestão Completa</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">SISTEMA W.S</div>
+            <ul class="nav-links">
+                <li style="color: #666; margin-right: 15px;">Olá, {{ usuario.username }}</li>
+                <li><a href="{{ url_for('main.index') }}">Ir para Site</a></li>
+                <li><a href="{{ url_for('main.logout') }}" style="color: #dc143c;">Sair</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <section class="admin-container">
+
+        <div style="grid-column: 1 / -1;">
+            <div class="dashboard-metrics">
+                <div class="metric-card">
+                    <h3>Agendados Hoje</h3>
+                    <div class="metric-number">{{ total_hoje }}</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Próximos 7 Dias</h3>
+                    <div class="metric-number">{{ total_semana }}</div>
+                </div>
+                <div class="metric-card" style="border-color: #ffc107;">
+                    <h3>Na Fila Agora</h3>
+                    <div class="metric-number" style="color: #ffc107;">{{ total_fila }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="painel-box">
+            <h2 style="color: #28a745;">🔥 Hoje</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Hora</th>
+                        <th>Cliente</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in agendamentos_hoje %}
+                    <tr>
+                        <td style="font-size: 18px; font-weight: bold;">{{ item.horario }}</td>
+                        <td>
+                            {{ item.nome }}<br>
+                            <small style="color:#888">{{ item.telefone }}</small>
+                        </td>
+                        <td><span class="status-badge badge-agendado">Agendado</span></td>
+                        <td style="display: flex; gap: 5px;">
+                            <a href="{{ url_for('main.checkin', id=item.id) }}" class="btn-checkin" title="Chegou"><i class="fas fa-check"></i></a>
+                            <a href="{{ url_for('main.editar', id=item.id) }}" class="btn-editar"><i class="fas fa-pen"></i></a>
+                            <a href="{{ url_for('main.cancelar', id=item.id) }}" class="btn-cancelar" onclick="return confirm('Cancelar?')"><i class="fas fa-times"></i></a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" style="text-align:center; padding:15px; color:#666">Nada para hoje.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <hr style="border: 0; border-top: 1px solid #444; margin: 30px 0;">
+
+            <h2 style="font-size: 20px; color: #dc143c;">📅 Futuros</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Cliente</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in agendamentos_futuros %}
+                    <tr>
+                        <td><strong>{{ item.data.strftime('%d/%m') }}</strong><br>{{ item.horario }}</td>
+                        <td>{{ item.nome }}</td>
+                        <td style="display: flex; gap: 5px;">
+                            <a href="{{ url_for('main.editar', id=item.id) }}" class="btn-editar"><i class="fas fa-pen"></i></a>
+                            <a href="{{ url_for('main.cancelar', id=item.id) }}" class="btn-cancelar" onclick="return confirm('Cancelar?')"><i class="fas fa-times"></i></a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" style="text-align:center; color:#666">Agenda vazia.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="painel-box" style="border-color: #ffc107;">
+            <h2 style="color: #ffc107;">✂️ Fila de Espera</h2>
+            {% if fila %}
+                <div style="margin-top: 20px;">
+                    <div class="fila-item" style="background: linear-gradient(45deg, #ffc107, #ff9800); color: #000; border: none;">
+                        <span class="fila-destaque">1. {{ fila[0].nome }}</span>
+                        <span style="font-weight: bold;">{{ fila[0].horario }}</span>
+                    </div>
+                    {% for cliente in fila[1:] %}
+                    <div class="fila-item" style="border-left: 4px solid #ffc107;">
+                        <span>{{ loop.index + 1 }}. {{ cliente.nome }}</span>
+                        <span class="status-badge badge-fila">Aguardando</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                <a href="{{ url_for('main.atender_proximo') }}" class="btn-finalizar">✅ FINALIZAR ATENDIMENTO</a>
+            {% else %}
+                <div style="padding: 40px; text-align: center; color: #666;">
+                    <h3>Fila Vazia</h3>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="painel-box" style="grid-column: 1 / -1; margin-top: 20px; border-color: #007bff;">
+            <h2 style="color: #007bff;">🛍️ Catálogo de Produtos</h2>
+            <p style="margin-bottom: 20px; color: #888;">Adicione produtos para aparecerem na página inicial.</p>
+
+            <form action="{{ url_for('main.novo_produto') }}" method="POST" enctype="multipart/form-data" style="display: flex; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; align-items: flex-end;">
+
+                <div style="flex: 2; min-width: 200px;">
+                    <label style="display: block; color: #fff; margin-bottom: 5px;">Nome do Produto</label>
+                    <input type="text" name="nome" required placeholder="Ex: Pomada Modeladora" style="width: 100%; padding: 10px; background: #1a1a1a; border: 1px solid #444; color: white; border-radius: 5px;">
+                </div>
+
+                <div style="flex: 1; min-width: 120px;">
+                    <label style="display: block; color: #fff; margin-bottom: 5px;">Preço</label>
+                    <input type="text" name="preco" required placeholder="R$ 35,00" style="width: 100%; padding: 10px; background: #1a1a1a; border: 1px solid #444; color: white; border-radius: 5px;">
+                </div>
+
+                <div style="flex: 1; min-width: 150px;">
+                    <label style="display: block; color: #fff; margin-bottom: 5px;">Foto (Arquivo)</label>
+                    <input type="file" name="imagem" accept="image/*" required style="width: 100%; padding: 10px; background: #1a1a1a; border: 1px solid #444; color: white; border-radius: 5px;">
+                </div>
+
+                <button type="submit" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; height: 40px; font-weight: bold; margin-bottom: 2px;">+ Adicionar</button>
+            </form>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Foto</th>
+                        <th>Nome</th>
+                        <th>Preço</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for prod in produtos %}
+                    <tr>
+                        <td>
+                            <img src="{{ url_for('static', filename='uploads/' + prod.imagem) }}" alt="Foto" style="width: 50px; height: 50px; object-fit: cover; border-radius: 5px;">
+                        </td>
+                        <td>{{ prod.nome }}</td>
+                        <td style="color: #28a745; font-weight: bold;">{{ prod.preco }}</td>
+                        <td>
+                            <a href="{{ url_for('main.deletar_produto', id=prod.id) }}" class="btn-cancelar" onclick="return confirm('Apagar este produto?')" title="Excluir">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" style="text-align:center; padding: 20px; color:#666;">Nenhum produto cadastrado.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </section>
+</body>
+</html>
+
+
+================================================================================
+ARQUIVO: app\templates\editar.html
+================================================================================
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Remarcar Cliente</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Estilos inline mantidos para centralizar o formulário específico desta página */
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .edit-box { background: #2a2a2a; padding: 40px; border-radius: 15px; border: 1px solid #dc143c; width: 400px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; background: #1a1a1a; border: 1px solid #444; color: white; }
+        button { width: 100%; padding: 15px; background: #dc143c; color: white; border: none; cursor: pointer; font-weight: bold; border-radius: 5px; }
+        button:hover { background: #b01030; }
+        .btn-cancel { background: transparent; border: 1px solid #666; margin-top: 10px; }
+        .btn-cancel:hover { background: #333; }
+    </style>
+</head>
+<body>
+    <div class="edit-box">
+        <h2 style="color: #dc143c; text-align: center;">Remarcar Cliente</h2>
+
+        <p style="text-align: center; margin-bottom: 20px;">Cliente: <strong>{{ cliente.nome }}</strong></p>
+
+        <form method="POST">
+            <label>Nova Data:</label>
+            <input type="date" name="data" value="{{ data }}" required>
+
+            <label>Novo Horário:</label>
+            <select name="horario" style="width: 100%; padding: 10px; background: #1a1a1a; color: white; border: 1px solid #444; margin-bottom: 20px;">
+                {% for h in ["09:00", "10:00", "11:00", "12:00", "14:00", "15:00", "16:00", "17:00", "18:00"] %}
+                    <option value="{{ h }}" {% if h == hora %}selected{% endif %}>{{ h }}</option>
+                {% endfor %}
+            </select>
+
+            <button type="submit">Salvar Alteração</button>
+
+            <a href="{{ url_for('main.admin_panel') }}"><button type="button" class="btn-cancel">Cancelar</button></a>
+        </form>
+    </div>
+</body>
+</html>
+
+
+================================================================================
+ARQUIVO: app\templates\index.html
+================================================================================
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barbearia W.S - Estilo e Atitude</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">W.S</div>
+
+            <div class="hamburger" id="hamburger-btn">
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </div>
+
+            <ul class="nav-links" id="nav-links">
+                <li><a href="#home" onclick="fecharMenu()">Início</a></li>
+                <li><a href="#agenda" onclick="fecharMenu()">Agenda</a></li>
+                <li><a href="#produtos" onclick="fecharMenu()">Loja</a></li>
+                <li><a href="{{ url_for('main.login') }}" style="color: #666;"><i class="fas fa-lock"></i></a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <section class="slider" id="home">
+        <div class="slides-wrapper">
+            <div class="slide active" id="slide-1">
+                <div class="hero-content">
+                    <h1>BARBEARIA W.S</h1>
+                    <p>Estilo, Atitude e Exclusividade</p>
+                    <a href="#agenda" class="cta-button">Agende seu Horário</a>
+                </div>
+            </div>
+            <div class="slide" id="slide-2">
+                <div class="hero-content">
+                    <h1>CONHEÇA NOSSA LOJA</h1>
+                    <p>Produtos e Roupas Exclusivas</p>
+                    <a href="#produtos" class="cta-button">Ver Produtos</a>
+                </div>
+            </div>
+            <div class="slide" id="slide-3">
+                <div class="hero-content">
+                    <h1>OS MELHORES PROFISSIONAIS</h1>
+                    <p>Tradição e Modernidade no seu Corte</p>
+                    <a href="#agenda" class="cta-button">Agende seu Horário</a>
+                </div>
+            </div>
+        </div>
+        <button class="slider-control prev" id="slide-prev">&#10094;</button>
+        <button class="slider-control next" id="slide-next">&#10095;</button>
+        <div class="slider-dots" id="slider-dots"></div>
+    </section>
+
+    <section id="agenda">
+        <h2>Agende seu Horário</h2>
+
+        <div class="agenda-container">
+            <div class="date-selector-wrapper">
+                <label for="date-selector">Escolha o dia:</label>
+                <input type="date" id="date-selector">
+            </div>
+
+            <div id="horarios-grid">
+                </div>
+        </div>
+    </section>
+
+    <section id="produtos">
+        <h2>Loja Exclusiva</h2>
+
+        <div class="products-grid">
+
+            {% for produto in produtos %}
+            <div class="product-card">
+
+                <div class="product-image">
+                    <img src="{{ url_for('static', filename='uploads/' + produto.imagem) }}"
+                         alt="{{ produto.nome }}"
+                         style="width: 100%; height: 100%; object-fit: cover;">
+                </div>
+
+                <div class="product-info">
+                    <h3>{{ produto.nome }}</h3>
+                    <p>Produto oficial W.S</p>
+                    <div class="product-price">{{ produto.preco }}</div>
+
+                    <button class="buy-button" onclick="comprar('{{ produto.nome }}')">Comprar</button>
+                </div>
+            </div>
+            {% else %}
+                <p style="text-align: center; color: #888; width: 100%; grid-column: 1 / -1; padding: 40px;">
+                    Nenhum produto disponível no momento. <br>
+                    <small>Acesse o painel admin para cadastrar.</small>
+                </p>
+            {% endfor %}
+
+        </div>
+    </section>
+
+    <footer>
+        <div class="footer-content">
+            <h3 style="color: #dc143c;">BARBEARIA W.S</h3>
+            <p>Estilo e atitude em um só lugar</p>
+            <div class="social-links">
+                <a href="#">📱</a>
+                <a href="#">📧</a>
+                <a href="#">📍</a>
+            </div>
+            <p>&copy; 2024 Barbearia W.S - Todos os direitos reservados</p>
+        </div>
+    </footer>
+
+    <div class="modal-overlay" id="booking-modal">
+        <div class="modal-content">
+            <button class="modal-close" id="modal-close-btn">&times;</button>
+            <h3>Confirmar Agendamento</h3>
+            <p id="modal-recap">Você está agendando para...</p>
+
+            <form id="booking-form" class="modal-form">
+                <div class="form-group">
+                    <label for="modal-nome">Seu Nome:</label>
+                    <input type="text" id="modal-nome" required>
+                </div>
+                <div class="form-group">
+                    <label for="modal-telefone">Seu Telefone:</label>
+                    <input type="tel" id="modal-telefone" required placeholder="(XX) XXXXX-XXXX">
+                </div>
+                <button type="submit" class="submit-button">Confirmar</button>
+            </form>
+        </div>
+    </div>
+
+    <a href="https://wa.me/5582999999999?text=Olá,%20gostaria%20de%20agendar%20um%20horário!"
+       class="btn-whatsapp"
+       target="_blank"
+       title="Fale conosco no WhatsApp">
+        <i class="fab fa-whatsapp"></i>
+    </a>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}?v=2"></script>
+</body>
+</html>
+
+
+
+================================================================================
+ARQUIVO: app\templates\login.html
+================================================================================
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Barbearia W.S</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="login-page">
+
+    <div class="login-container">
+        <div class="login-box">
+            <h2 style="color: #dc143c; margin-bottom: 20px;">Área Restrita</h2>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="alert-error">
+                        {{ messages[0] }}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form action="{{ url_for('main.login') }}" method="POST">
+                <div class="input-group">
+                    <label for="username">Usuário</label>
+                    <input type="text" id="username" name="username" required placeholder="Digite seu usuário">
+                </div>
+
+                <div class="input-group">
+                    <label for="password">Senha</label>
+                    <input type="password" id="password" name="password" required placeholder="Digite sua senha">
+                </div>
+
+                <button type="submit" class="btn-login">ENTRAR</button>
+            </form>
+
+            <div class="login-footer">
+                <a href="{{ url_for('main.index') }}">← Voltar para o Site</a>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
+

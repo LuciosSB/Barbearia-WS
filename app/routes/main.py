@@ -5,6 +5,7 @@ from werkzeug.utils import secure_filename
 from app import db, login_manager
 from app.models import Agendamento, Usuario, Produto, Configuracao
 from datetime import datetime, date, timedelta
+from sqlalchemy import text
 
 main_bp = Blueprint('main', __name__)
 
@@ -328,3 +329,11 @@ def editar(id):
         db.session.commit()
         return redirect(url_for('main.admin_panel'))
     return render_template('editar.html', cliente=agendamento, data=agendamento.data, hora=agendamento.horario, id=id)
+
+@main_bp.route('/limpar-banco-nuclear')
+def limpar_banco():
+    # Apaga as tabelas antigas para criar as novas
+    sql = text("DROP TABLE IF EXISTS agendamentos, usuarios, produtos, configuracoes CASCADE;")
+    db.session.execute(sql)
+    db.session.commit()
+    return "Banco de dados limpo com sucesso! Agora acesse /setup."

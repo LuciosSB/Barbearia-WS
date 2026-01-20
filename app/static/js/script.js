@@ -298,3 +298,4 @@ window.comprar = function(produto) {
 
     window.open(url, '_blank');
 };
+
