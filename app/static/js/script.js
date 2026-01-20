@@ -10,10 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const horariosGrid = document.getElementById('horarios-grid');
     const inputTelefone = document.getElementById('modal-telefone');
 
-    const horariosFuncionamento = [
-        "09:00", "10:00", "11:00", "12:00",
-        "14:00", "15:00", "16:00", "17:00", "18:00"
-    ];
     let slotSelecionado = { data: null, horario: null };
 
     // =========================================
@@ -44,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
         inputTelefone.addEventListener('input', (e) => {
             let value = e.target.value.replace(/\D/g, '');
             if (value.length > 11) value = value.slice(0, 11);
+
             if (value.length > 6) {
                 value = `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`;
             } else if (value.length > 2) {
@@ -60,29 +57,39 @@ document.addEventListener('DOMContentLoaded', () => {
         slotSelecionado.data = data;
         slotSelecionado.horario = horario;
         const dataFormatada = data.split('-').reverse().join('/');
+
         if(modalRecap) modalRecap.innerText = `Agendando para: ${dataFormatada} às ${horario}`;
         if(modal) modal.classList.add('show');
     };
+
     function fecharModal() {
         if(modal) modal.classList.remove('show');
         if(bookingForm) bookingForm.reset();
     }
+
     if (modalCloseBtn) modalCloseBtn.addEventListener('click', fecharModal);
+
     if (bookingForm) {
         bookingForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+
             const nome = document.getElementById('modal-nome').value;
             const telefone = document.getElementById('modal-telefone').value;
+            const observacoes = document.getElementById('modal-obs').value;
+
             if (telefone.length < 14) {
                 showToast('Por favor, digite um telefone válido.', 'error');
                 return;
             }
+
             const payload = {
                 data: slotSelecionado.data,
                 horario: slotSelecionado.horario,
                 nome: nome,
-                telefone: telefone
+                telefone: telefone,
+                observacoes: observacoes
             };
+
             try {
                 const response = await fetch('/agendar', {
                     method: 'POST',
@@ -90,6 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify(payload)
                 });
                 const result = await response.json();
+
                 if (result.sucesso) {
                     showToast(`Agendamento Confirmado!`, 'success');
                     fecharModal();
@@ -104,22 +112,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =========================================
-    // 5. GRID DE HORÁRIOS
+    // 5. GRID DE HORÁRIOS (INTELIGENTE)
     // =========================================
     async function carregarHorarios(dataSelecionada) {
         if(!horariosGrid) return;
-        horariosGrid.innerHTML = '<p style="color:gray">Verificando...</p>';
+        horariosGrid.innerHTML = '<p style="color:gray">Verificando agenda...</p>';
         try {
             const response = await fetch(`/api/horarios/${dataSelecionada}`);
             const dados = await response.json();
-            renderizarGrid(dataSelecionada, dados.ocupados || []);
+
+            const slotsDoDia = dados.slots || [];
+            const ocupados = dados.ocupados || [];
+
+            if (slotsDoDia.length === 0) {
+                horariosGrid.innerHTML = '<p style="color:#dc143c; grid-column: 1/-1; text-align:center;">Não abrimos neste dia.</p>';
+                return;
+            }
+
+            renderizarGrid(dataSelecionada, slotsDoDia, ocupados);
         } catch (error) {
             horariosGrid.innerHTML = '<p style="color:red">Erro ao carregar.</p>';
         }
     }
-    function renderizarGrid(dataSelecionada, listaOcupados) {
+
+    function renderizarGrid(dataSelecionada, slotsPossiveis, listaOcupados) {
         if(!horariosGrid) return;
         horariosGrid.innerHTML = '';
+
         const agora = new Date();
         const ano = agora.getFullYear();
         const mes = String(agora.getMonth() + 1).padStart(2, '0');
@@ -128,7 +147,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const horaAtual = agora.getHours();
         const minutoAtual = agora.getMinutes();
         const isHoje = (dataSelecionada === dataAtualStr);
-        horariosFuncionamento.forEach(horario => {
+
+        slotsPossiveis.forEach(horario => {
             const btn = document.createElement('button');
             btn.classList.add('horario-slot');
             btn.innerText = horario;
@@ -138,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let bloqueado = false;
             if (listaOcupados.includes(horario)) bloqueado = true;
             if (isHoje) {
-                if (horaBtn < horaAtual || (horaBtn === horaAtual && minutoBtn < minutoAtual)) {
+                if (horaBtn < horaAtual || (horaBtn === horaAtual)) {
                     bloqueado = true;
                 }
             }
@@ -272,7 +292,9 @@ window.fecharMenu = function() {
 
 window.comprar = function(produto) {
     const telefoneBarbearia = "5582987126184";
+
     const texto = `Olá! Gostaria de comprar o produto: *${produto}*. Como faço para retirar?`;
     const url = `https://wa.me/${telefoneBarbearia}?text=${encodeURIComponent(texto)}`;
+
     window.open(url, '_blank');
 };

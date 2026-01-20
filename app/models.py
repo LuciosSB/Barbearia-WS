@@ -11,6 +11,7 @@ class Agendamento(db.Model):
     data = db.Column(db.Date, nullable=False)
     horario = db.Column(db.String(5), nullable=False)
     status = db.Column(db.String(20), default='agendado')
+    observacoes = db.Column(db.String(200))
 
     def to_dict(self):
         return {
@@ -19,7 +20,8 @@ class Agendamento(db.Model):
             "telefone": self.telefone,
             "data": str(self.data),
             "horario": self.horario,
-            "status": self.status
+            "status": self.status,
+            "observacoes": self.observacoes
         }
 
 class Usuario(UserMixin, db.Model):
@@ -41,3 +43,9 @@ class Produto(db.Model):
     nome = db.Column(db.String(100), nullable=False)
     preco = db.Column(db.String(20), nullable=False)
     imagem = db.Column(db.String(200), nullable=False)
+
+class Configuracao(db.Model):
+    __tablename__ = 'configuracoes'
+    id = db.Column(db.Integer, primary_key=True)
+    chave = db.Column(db.String(50), unique=True, nullable=False)
+    valor = db.Column(db.String(50), nullable=False)

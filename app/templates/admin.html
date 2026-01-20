@@ -5,6 +5,27 @@
     <title>W.S - Gestão Completa</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Estilos específicos para o Modal de Senha do Admin */
+        .admin-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8); z-index: 3000;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; visibility: hidden; transition: all 0.3s;
+        }
+        .admin-modal.open { opacity: 1; visibility: visible; }
+        .admin-modal-box {
+            background: #2a2a2a; padding: 30px; border-radius: 10px;
+            border: 2px solid #dc3545; width: 90%; max-width: 400px;
+            text-align: center; position: relative;
+            transform: translateY(-20px); transition: all 0.3s;
+        }
+        .admin-modal.open .admin-modal-box { transform: translateY(0); }
+        .close-modal {
+            position: absolute; top: 10px; right: 15px; background: none;
+            border: none; color: #fff; font-size: 24px; cursor: pointer;
+        }
+    </style>
 </head>
 <body>
     <header>
@@ -21,6 +42,20 @@
     <section class="admin-container">
 
         <div style="grid-column: 1 / -1;">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div style="padding: 15px; margin-bottom: 20px; border-radius: 8px; font-weight: bold; text-align: center;
+                                    {% if category == 'success' %} background: rgba(40, 167, 69, 0.2); border: 1px solid #28a745; color: #28a745;
+                                    {% else %} background: rgba(220, 53, 69, 0.2); border: 1px solid #dc3545; color: #dc3545; {% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <div style="grid-column: 1 / -1;">
             <div class="dashboard-metrics">
                 <div class="metric-card">
                     <h3>Agendados Hoje</h3>
@@ -35,6 +70,58 @@
                     <div class="metric-number" style="color: #ffc107;">{{ total_fila }}</div>
                 </div>
             </div>
+        </div>
+
+        <div class="painel-box" style="grid-column: 1 / -1; margin-bottom: 20px; border-color: #9c27b0;">
+            <h2 style="color: #9c27b0;">⚙️ Configuração de Horários</h2>
+            <form action="{{ url_for('main.configurar_horarios') }}" method="POST" style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end;">
+
+                <div style="flex: 1; min-width: 200px;">
+                    <h4 style="color: #fff; margin-bottom: 10px;">Segunda a Sexta</h4>
+                    <div style="display: flex; gap: 10px;">
+                        <div>
+                            <label style="color: #888; font-size: 12px;">Abertura</label>
+                            <select name="semana_inicio" style="padding: 10px; background: #1a1a1a; border: 1px solid #444; color: white; border-radius: 5px;">
+                                {% for h in range(6, 23) %}
+                                    <option value="{{ '%02d' % h }}:00" {% if c_sem_ini == ('%02d' % h)+':00' %}selected{% endif %}>{{ '%02d' % h }}:00</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label style="color: #888; font-size: 12px;">Fechamento</label>
+                            <select name="semana_fim" style="padding: 10px; background: #1a1a1a; border: 1px solid #444; color: white; border-radius: 5px;">
+                                {% for h in range(12, 24) %}
+                                    <option value="{{ '%02d' % h }}:00" {% if c_sem_fim == ('%02d' % h)+':00' %}selected{% endif %}>{{ '%02d' % h }}:00</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="flex: 1; min-width: 200px;">
+                    <h4 style="color: #fff; margin-bottom: 10px;">Sábado</h4>
+                    <div style="display: flex; gap: 10px;">
+                        <div>
+                            <label style="color: #888; font-size: 12px;">Abertura</label>
+                            <select name="sabado_inicio" style="padding: 10px; background: #1a1a1a; border: 1px solid #444; color: white; border-radius: 5px;">
+                                {% for h in range(6, 23) %}
+                                    <option value="{{ '%02d' % h }}:00" {% if c_sab_ini == ('%02d' % h)+':00' %}selected{% endif %}>{{ '%02d' % h }}:00</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label style="color: #888; font-size: 12px;">Fechamento</label>
+                            <select name="sabado_fim" style="padding: 10px; background: #1a1a1a; border: 1px solid #444; color: white; border-radius: 5px;">
+                                {% for h in range(12, 24) %}
+                                    <option value="{{ '%02d' % h }}:00" {% if c_sab_fim == ('%02d' % h)+':00' %}selected{% endif %}>{{ '%02d' % h }}:00</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" style="padding: 10px 20px; background: #9c27b0; color: white; border: none; border-radius: 5px; cursor: pointer; height: 40px; font-weight: bold;">Salvar Horários</button>
+            </form>
         </div>
 
         <div class="painel-box">
@@ -55,6 +142,12 @@
                         <td>
                             {{ item.nome }}<br>
                             <small style="color:#888">{{ item.telefone }}</small>
+                            {% if item.observacoes %}
+                                <br>
+                                <small style="color: #ffc107; font-style: italic;">
+                                    <i class="fas fa-comment"></i> {{ item.observacoes }}
+                                </small>
+                            {% endif %}
                         </td>
                         <td><span class="status-badge badge-agendado">Agendado</span></td>
                         <td style="display: flex; gap: 5px;">
@@ -84,7 +177,12 @@
                     {% for item in agendamentos_futuros %}
                     <tr>
                         <td><strong>{{ item.data.strftime('%d/%m') }}</strong><br>{{ item.horario }}</td>
-                        <td>{{ item.nome }}</td>
+                        <td>
+                            {{ item.nome }}
+                            {% if item.observacoes %}
+                                <br><small style="color: #ffc107;"><i class="fas fa-comment"></i> {{ item.observacoes }}</small>
+                            {% endif %}
+                        </td>
                         <td style="display: flex; gap: 5px;">
                             <a href="{{ url_for('main.editar', id=item.id) }}" class="btn-editar"><i class="fas fa-pen"></i></a>
                             <a href="{{ url_for('main.cancelar', id=item.id) }}" class="btn-cancelar" onclick="return confirm('Cancelar?')"><i class="fas fa-times"></i></a>
@@ -174,6 +272,96 @@
             </table>
         </div>
 
+        <div class="painel-box" style="grid-column: 1 / -1; margin-top: 20px; border-color: #dc3545;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 20px;">
+
+                <div style="flex: 1; min-width: 300px;">
+                    <h2 style="color: #dc3545;">🔒 Segurança</h2>
+                    <p style="margin-bottom: 15px; color: #888;">Gerenciar acesso ao sistema.</p>
+                    <button onclick="abrirModalSenha()" style="padding: 15px 30px; background: #dc3545; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; width: 100%;">
+                        <i class="fas fa-key"></i> Alterar Senha
+                    </button>
+                </div>
+
+                <div style="flex: 1; min-width: 300px; background: #1a1a1a; padding: 15px; border-radius: 10px; border: 1px solid #444;">
+                    <h3 style="color: #fff; font-size: 16px; margin-bottom: 10px;">
+                        📡 Status da Conexão: <span id="status-texto" style="color: #28a745;">Online</span>
+                    </h3>
+                    <p style="font-size: 12px; color: #888; margin-bottom: 10px;">
+                        Mantendo o sistema acordado automaticamente.
+                    </p>
+                    <div style="font-size: 12px; color: #666;">
+                        Último Ping: <span id="last-ping">--:--:--</span>
+                    </div>
+                    <div style="margin-top: 10px; width: 10px; height: 10px; background: #28a745; border-radius: 50%; box-shadow: 0 0 10px #28a745; animation: pulse-green 2s infinite;"></div>
+                </div>
+
+            </div>
+        </div>
+
     </section>
+
+    <div id="modal-senha" class="admin-modal">
+        <div class="admin-modal-box">
+            <button class="close-modal" onclick="fecharModalSenha()">&times;</button>
+            <h3 style="color: #dc3545; margin-bottom: 20px;">Alterar Senha de Acesso</h3>
+
+            <form action="{{ url_for('main.alterar_senha') }}" method="POST">
+                <div style="margin-bottom: 15px; text-align: left;">
+                    <label style="color: #fff; display: block; margin-bottom: 5px;">Senha Atual</label>
+                    <input type="password" name="senha_atual" required style="width: 100%; padding: 10px; background: #1a1a1a; border: 1px solid #444; color: white; border-radius: 5px;">
+                </div>
+
+                <div style="margin-bottom: 25px; text-align: left;">
+                    <label style="color: #fff; display: block; margin-bottom: 5px;">Nova Senha</label>
+                    <input type="password" name="nova_senha" required style="width: 100%; padding: 10px; background: #1a1a1a; border: 1px solid #444; color: white; border-radius: 5px;">
+                </div>
+
+                <button type="submit" style="width: 100%; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px;">
+                    Confirmar Alteração
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Lógica do Modal de Senha
+        function abrirModalSenha() {
+            document.getElementById('modal-senha').classList.add('open');
+        }
+
+        function fecharModalSenha() {
+            document.getElementById('modal-senha').classList.remove('open');
+        }
+
+        // Lógica do Ping (Anti-Sleep)
+        function pingServer() {
+            fetch('/keep-alive')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('last-ping').innerText = data.timestamp;
+                    const statusEl = document.getElementById('status-texto');
+                    statusEl.innerText = "Online (Ativo)";
+                    statusEl.style.color = "#28a745";
+                })
+                .catch(error => {
+                    const statusEl = document.getElementById('status-texto');
+                    statusEl.innerText = "Desconectado";
+                    statusEl.style.color = "#dc3545";
+                });
+        }
+
+        // Roda o ping a cada 5 minutos
+        setInterval(pingServer, 300000);
+        pingServer();
+    </script>
+
+    <style>
+        @keyframes pulse-green {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+    </style>
 </body>
 </html>
